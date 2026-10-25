@@ -171,13 +171,63 @@ class Layer:
         self.follow = spec.get("follow", [])
         self.anchor = spec.get("anchor", "bottom" if self.kind == "character" else "center")
         self._cache: dict = {}
+        self.anim = spec.get("anim") or {}
+        self._flipped: dict = {}
 
-    def image_at(self, t: float) -> Image.Image:
+    # ---- which picture is shown at time t (walk cycle > gesture > talking mouth > timed poses > base)
+    def _named(self, name: str) -> Optional[Image.Image]:
+        return self.images.get("f:" + name)
+
+    def facing(self, t: float) -> int:
+        d = int(self.anim.get("facing", 1))
+        for seg in self.anim.get("walk", []):
+            if seg["from"] <= t:
+                d = seg["dir"]
+        return d
+
+    def walk_seg(self, t: float):
+        for seg in self.anim.get("walk", []):
+            if seg["from"] <= t < seg["to"]:
+                return seg
+        return None
+
+    def _pick(self, t: float) -> Image.Image:
+        seg = self.walk_seg(t)
+        if seg:
+            frames = [f for f in seg.get("frames", ["walk1", "walk2"]) if self._named(f) is not None]
+            if frames:
+                k = int((t - seg["from"]) / seg.get("period", 0.24)) % len(frames)
+                return self._named(frames[k])
+        for g in self.anim.get("gestures", []):
+            if g["from"] <= t < g["to"] and self._named(g["pose"]) is not None:
+                return self._named(g["pose"])
+        talk = self._named("talk")
+        if talk is not None:
+            for a, b in self.anim.get("mouth", []):
+                if a <= t < b:
+                    return talk
         img = self.images["base"]
         for i, pose in enumerate(self.spec.get("poses", [])):
             if t >= pose["t"]:
                 img = self.images[f"pose_{i}"]
         return img
+
+    def image_at(self, t: float) -> Image.Image:
+        img = self._pick(t)
+        if self.facing(t) * int(self.anim.get("image_faces", 1)) < 0:
+            f = self._flipped.get(id(img))
+            if f is None:
+                f = self._flipped[id(img)] = img.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
+            img = f
+        return img
+
+    def bob(self, t: float) -> float:
+        """Small up-down step bounce while walking (fraction of the layer height)."""
+        seg = self.walk_seg(t)
+        if not seg:
+            return 0.0
+        per = seg.get("period", 0.24)
+        return -abs(math.sin(math.pi * (t - seg["from"]) / per)) * 0.025
 
     def props_at(self, t: float) -> dict:
         kfs = self.kfs
@@ -240,7 +290,7 @@ class OverlayScene:
         img = layer.image_at(t)
         hpx = layer.base_h * pr["scale"]
         wpx = img.width * hpx / max(1, img.height)
-        x, y = pr["x"] * self.w, pr["y"] * self.h
+        x, y = pr["x"] * self.w, pr["y"] * self.h + layer.bob(t) * hpx
         follow_pos = self._follow(layer, t, depth)
         if follow_pos is not None:
             x, y = follow_pos

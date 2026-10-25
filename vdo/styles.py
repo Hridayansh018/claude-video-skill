@@ -69,8 +69,10 @@ class StyleBook:
         lead = st.get("background_prefix") or st.get("prompt_prefix", "")
         return f"{lead} Scene: {subject.strip().rstrip('.')}. {st.get('background_suffix', '')}".strip()
 
-    def layer_prompt(self, style: str, subject: str, kind: str = "character") -> str:
+    def layer_prompt(self, style: str, subject: str, kind: str = "character", key: Optional[str] = None) -> str:
+        from .cast import key_for, screen_text
         st = self.get(style)
         suffix = st.get("prop_suffix" if kind == "prop" else "character_suffix", "")
+        suffix = suffix.replace("{screen}", screen_text(key_for(subject, key)))
         lead = st.get("prop_prefix" if kind == "prop" else "character_prefix") or st.get("prompt_prefix", "")
         return f"{lead} Subject: {subject.strip().rstrip('.')}. {suffix}".strip()

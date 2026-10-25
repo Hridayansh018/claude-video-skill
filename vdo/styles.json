@@ -9,8 +9,8 @@
     "character_prefix": "Flat 2D cartoon character in a hand-drawn educational history animation style: clean bold black ink outlines, smooth cel shading with soft gradients, warm natural colours. The character is a simple cartoon stick figure with a large perfectly round white head, small expressive face with dot eyes and simple eyebrows, thin black stick arms and legs, white rounded mitten hands and white rounded feet, wearing simple cloth clothing.",
     "prop_prefix": "Flat 2D cartoon object in a hand-drawn educational history animation style: clean bold black ink outlines, smooth cel shading with soft gradients, warm natural colours.",
     "background_suffix": "Empty scene with no people or characters in it, leave open space in the middle and foreground for characters to be added later. 16:9. No text, no captions, no watermark.",
-    "character_suffix": "A single character only, full body, centred, isolated on a plain pure white background, no ground, no shadow, no scenery, no text.",
-    "prop_suffix": "A single object only, centred, isolated on a plain pure white background, no shadow, no scenery, no text.",
+    "character_suffix": "A single character only, the whole body from head to feet, centred, nothing cropped, {screen}.",
+    "prop_suffix": "A single object only, centred, nothing cropped, {screen}.",
     "generator": {"provider": "flow", "width": 1376, "height": 768, "seed": 4200},
     "shot_variants": ["wide shot", "medium shot", "close-up"],
     "hold": {"min": 2.5, "max": 8.0},
@@ -23,7 +23,7 @@
     "frame_fx": {"grain": 0.0, "vignette": 0.12},
     "cutout": "key",
     "subtitle": {"font": "Arial Rounded MT Bold", "size": 50, "color": "#FFFFFF", "outline": "#1E1A1C", "outline_width": 4, "bold": 1, "margin_v": 56},
-    "sfx": {"scene_transition": "whoosh_soft", "cut_transition": null, "overlay_enter": "swish", "overlay_land": "pop"}
+    "sfx": {"scene_transition": "air_soft", "cut_transition": null, "overlay_enter": "slide_soft", "overlay_land": "pop_soft"}
   },
 
   "oil": {
@@ -31,8 +31,8 @@
     "prompt_prefix": "Cinematic historical documentary still, hyper-realistic graphic-novel oil painting, thick visible brushstrokes, dramatic chiaroscuro lighting, volumetric light.",
     "prompt_suffix": "16:9 widescreen composition, no text, no letters, no watermark.",
     "background_suffix": "Empty scene with no people in it. 16:9. No text, no watermark.",
-    "character_suffix": "A single character, full body, isolated on a plain pure white background, no ground, no shadow, oil painting style.",
-    "prop_suffix": "A single object, centred, isolated on a plain pure white background, no shadow, oil painting style.",
+    "character_suffix": "A single character, full body, oil painting style, nothing cropped, {screen}.",
+    "prop_suffix": "A single object, centred, oil painting style, nothing cropped, {screen}.",
     "generator": {"provider": "flow", "width": 1376, "height": 768, "seed": 7100},
     "shot_variants": ["wide establishing shot", "medium shot", "close-up detail shot"],
     "hold": {"min": 2.5, "max": 7.0},
@@ -45,6 +45,6 @@
     "frame_fx": {"grain": 0.03, "vignette": 0.3},
     "cutout": "key",
     "subtitle": {"font": "Georgia", "size": 52, "color": "#FFFFFF", "outline": "#000000", "outline_width": 3, "bold": 0, "margin_v": 60},
-    "sfx": {"scene_transition": "whoosh_soft", "cut_transition": null, "overlay_enter": "whoosh", "overlay_land": "impact_low"}
+    "sfx": {"scene_transition": "air_soft", "cut_transition": null, "overlay_enter": "slide_soft", "overlay_land": "pop_soft"}
   }
 }

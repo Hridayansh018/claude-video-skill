@@ -113,16 +113,32 @@ IMG_EXT = (".png", ".jpg", ".jpeg", ".webp")
 
 def job_list(b: Build) -> list[dict]:
     """Every picture / cut-out / clip the plan needs, with a ready-to-paste prompt for Google Flow."""
+    from . import cast as C
     jobs = []
     scenes = {s["id"]: s for s in b.project["scenes"]}
+    # recurring characters first: the master picture of each, then its poses (made from the master)
+    cast = b.project.get("cast") or {}
+    default_style = b.project["default_style"]
+    for name, poses in C.used_poses(b.project).items():
+        member = cast[name]
+        st = b.styles.get(member.get("style") or default_style)
+        prefix = st.get("character_prefix") or st.get("prompt_prefix", "")
+        key = C.key_for(member["look"], member.get("key"))
+        where = [s["id"] for s in b.project["scenes"]
+                 if any(l.get("cast") == name for l in (s.get("overlay") or {}).get("layers", []))]
+        jobs.append({"id": C.job_id(name, "base"), "scene": ",".join(where), "kind": "cast", "cast": name,
+                     "pose": "base", "key": key, "prompt": member.get("exact") or C.master_prompt(prefix, member, key),
+                     "narration": f"master picture of '{name}' (used in {', '.join(where)})"})
+        for pose in sorted(poses - {"base"}):
+            jobs.append({"id": C.job_id(name, pose), "scene": ",".join(where), "kind": "cast_pose", "cast": name,
+                         "pose": pose, "key": key, "reference": C.job_id(name, "base"),
+                         "prompt": C.pose_prompt(prefix, member, pose, key),
+                         "narration": f"'{name}' pose '{pose}' - attach {C.job_id(name, 'base')} as the reference"})
     for pool_id, pool in b.plan["pools"].items():
         sc = scenes[pool_id]
         style = sc["style"]
         nar = sc.get("voiceover", "")
         if pool.get("clip"):
-            if not os.path.exists(sc["clip"]):
-                jobs.append({"id": f"{pool_id}_clip", "scene": pool_id, "kind": "video", "file": sc["clip"],
-                             "prompt": sc.get("clip_prompt") or sc.get("visual") or nar, "narration": nar})
             continue
         if pool.get("overlay"):
             ov = sc["overlay"]
@@ -131,6 +147,8 @@ def job_list(b: Build) -> list[dict]:
                 jobs.append({"id": f"{pool_id}_bg", "scene": pool_id, "kind": "background",
                              "prompt": bg.get("exact") or b.styles.background_prompt(style, bg["prompt"]), "narration": nar})
             for layer in ov["layers"]:
+                if layer.get("cast"):
+                    continue
                 kind = layer.get("kind", "character")
                 for slot, entry in [("", layer["image"])] + [(f"_pose{i + 1}", p["image"]) for i, p in enumerate(layer["poses"])]:
                     if not entry.get("path"):
@@ -197,7 +215,8 @@ def find_file(base: Path, job: dict) -> Optional[str]:
 def step_images(b: Build):
     log("[3/7] Pictures")
     gen = ImageGenerator(b.settings.cache_dir, b.settings.hf_token)
-    post = PostProcessor(b.settings.cache_dir, b.canvas, b.settings.realesrgan_path)
+    post = PostProcessor(b.settings.cache_dir, b.canvas, b.settings.realesrgan_path,
+                         float(b.project.get("corner_crop", 0.08)))
     seed0 = int(b.project.get("seed", 0))
     scenes = {s["id"]: s for s in b.project["scenes"]}
     base = Path(b.project["base_dir"])
@@ -257,6 +276,17 @@ def step_images(b: Build):
                 lstyle = layer.get("style", style_name)
                 method = layer.get("cutout") or b.styles.get(lstyle).get("cutout", "auto")
                 imgs = {}
+                if layer.get("cast"):
+                    from . import cast as C
+                    base_pose = layer.get("pose") or "base"
+                    for pose in [base_pose] + sorted(C.layer_poses(layer) - {base_pose}):
+                        jid = C.job_id(layer["cast"], pose)
+                        m = make({"prompt": b.project["cast"][layer["cast"]]["look"]}, 50 + li * 7 + len(imgs),
+                                 kind="character", job_id=jid)
+                        cut = post.cutout(m["path"], method)
+                        imgs["base" if pose == base_pose else "f:" + pose] = cut
+                    layers[layer["id"]] = imgs
+                    continue
                 for slot, entry in [("base", layer["image"])] + [(f"pose_{i}", p["image"])
                                                                   for i, p in enumerate(layer["poses"])]:
                     jid = f"{pool_id}_{layer['id']}" + ("" if slot == "base" else f"_pose{int(slot.split('_')[1]) + 1}")
@@ -413,23 +443,47 @@ def step_audio(b: Build):
     for sid, v in b.voices.items():
         mix.place("voice", v["path"], windows[sid]["voice_start"], a["voice_gain_db"], label=f"voice {sid}")
 
+    from . import events as EV
+    from .popups import find_phrase
+    from .sfx_lib import LEVELS
+    placed: list[tuple[float, str]] = []
+
     def add_sfx(name, at, gain=0.0, center=False, label=""):
+        # the same sound twice within 0.2 s sounds like a glitch: skip it
+        if any(n == name and abs(t - at) < 0.2 for t, n in placed):
+            return
         path = sfx.resolve(name, seed=int(at * 10))
         if not path:
             return
         if center:
             at = at - min(_sound_len(path, b.ff), 1.2) / 2
-        mix.place("sfx", path, at, a["sfx_gain_db"] + gain, label=label or name)
+        placed.append((at, name))
+        mix.place("sfx", path, at, a["sfx_gain_db"] + LEVELS.get(name, 0.0) + gain, label=label or name)
 
-    if a.get("auto_sfx", True):
+    def word_time(sid, cue, after=0.0):
+        """Scene-relative seconds for a cue: a number, or a word/phrase from the scene's voiceover."""
+        if cue is None:
+            return None
+        if isinstance(cue, (int, float)):
+            return float(cue)
+        v = b.voices.get(sid)
+        if not v:
+            return None
+        t = find_phrase(v["words"], str(cue), after)
+        return None if t is None else (windows[sid]["voice_start"] - windows[sid]["start"]) + t
+
+    trans = a.get("transition_sfx", "auto")      # "auto" (style's sound) | "none" | a sound name
+    if a.get("auto_sfx", True) and trans != "none":
         for cut in b.plan["cuts"]:
             tr = cut.get("transition_in")
             if not tr:
                 continue
             st = b.styles.get(cut["style"]).get("sfx", {})
             name = st.get("cut_transition") if tr["kind"] == "cut" else st.get("scene_transition")
+            if trans not in ("auto", None) and tr["kind"] != "cut":
+                name = trans
             if name:
-                add_sfx(name, cut["start"], -3 if tr["kind"] == "cut" else 0, center=True,
+                add_sfx(name, cut["start"], float(a.get("transition_gain_db", 0.0)), center=True,
                         label=f"{tr['kind']} transition")
         for sid, ov in ((s["id"], s["overlay"]) for s in b.project["scenes"] if s.get("overlay")):
             st = b.styles.get(scenes[sid]["style"]).get("sfx", {})
@@ -449,15 +503,28 @@ def step_audio(b: Build):
                     add_sfx(fx["sfx"], start + fx["t"], label=f"fx {fx['type']}")
     for sc in b.project["scenes"]:
         win = windows[sc["id"]]
+        explicit = set()
         for s in sc.get("sfx", []):
-            at = win["start"] + (s["at"] if s.get("at") is not None else 0.2)
+            rel = word_time(sc["id"], s.get("at"))
+            at = win["start"] + (rel if rel is not None else 0.2)
+            explicit.add(s.get("name"))
             add_sfx(s.get("path") or s["name"], at, float(s.get("gain_db", 0)), label=s.get("name", "sfx"))
-        if sc.get("ambience"):
+        # sounds for what the narration describes ("the crowd cheered" -> cheer under "cheered")
+        if a.get("auto_events", True) and sc.get("auto_sfx", True) and sc["id"] in b.voices:
+            for t, name, word in EV.find_events(b.voices[sc["id"]]["words"], int(a.get("max_events_per_scene", 2))):
+                if name in explicit:
+                    continue
+                add_sfx(name, win["voice_start"] + t - 0.05, float(a.get("event_gain_db", 0.0)), label=f"event {name} ({word})")
+        amb_name = sc.get("ambience")
+        if not amb_name and a.get("auto_ambience", True) and sc.get("auto_sfx", True):
+            amb_name = EV.pick_ambience(" ".join([sc.get("voiceover") or "", sc.get("visual") or ""]))
+        if amb_name:
+            sc["_ambience_used"] = amb_name
             length = win["end"] - win["start"] + 1.0
-            path = sfx.resolve(sc["ambience"], seed=sc["index"], duration=length)
+            path = sfx.resolve(amb_name, seed=sc["index"], duration=length)
             if path:
                 mix.place("amb", path, max(0, win["start"] - 0.5), a["ambience_gain_db"], length=length + 0.5,
-                          loop=True, fade_in=0.8, fade_out=1.0, label=f"ambience {sc['ambience']}")
+                          loop=True, fade_in=0.8, fade_out=1.0, label=f"ambience {amb_name}")
     # sound that came with generated video clips (Veo makes its own ambience / sfx)
     for cl in b.clips:
         sc = scenes[cl["cut"]["scene_id"]]

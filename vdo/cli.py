@@ -142,10 +142,11 @@ def cmd_build(args):
 
 
 def cmd_sfx_list(args):
-    from .sfx import AMBIENCE, PROCEDURAL
+    from .sfx_lib import BEDS, ONE_SHOTS
     s = load_settings(args.config)
-    log("Built-in sounds (generated, licence-free): " + ", ".join(PROCEDURAL))
-    log("Ambience beds: " + ", ".join(sorted(AMBIENCE)))
+    log("Sound effects (generated, licence-free): " + ", ".join(sorted(ONE_SHOTS)))
+    log("Ambience beds (scene \"ambience\"): " + ", ".join(sorted(BEDS)))
+    log("Also: any folder in sfx_library/<name>/ with your own .wav/.mp3 files overrides a built-in of that name.")
     lib = Path(s.sfx_library_dir)
     names = sorted(p.name for p in lib.iterdir() if p.is_dir()) if lib.exists() else []
     log(f"Your library ({lib}): " + (", ".join(names) if names else "(empty)"))
@@ -163,7 +164,7 @@ def cmd_doctor(args):
         ok = False
         log(f"[!!] ffmpeg: MISSING - {e}")
     for mod, why, required in (("numpy", "maths", True), ("PIL", "pictures (pillow)", True),
-                               ("scipy", "sound effects", False), ("soundfile", "voice/music files", True),
+                               ("scipy", "sound effects", True), ("soundfile", "voice/music files", True),
                                ("kokoro_onnx", "offline voice (Kokoro)", True), ("edge_tts", "online voice (optional)", False),
                                ("rembg", "better cut-outs (optional)", False)):
         try:

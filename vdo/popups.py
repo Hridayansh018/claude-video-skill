@@ -59,8 +59,29 @@ def _offscreen(direction: str, layer: dict) -> dict:
             "scale": {"scale": 0.05, "opacity": 0.0}, "fade": {"opacity": 0.0}}.get(direction, {"y": below})
 
 
+WALK_SPEED = 0.26     # frame widths per second
+RUN_SPEED = 0.62
+WALK_PERIOD = 0.24    # seconds per step picture
+RUN_PERIOD = 0.13
+
+
+def _mouth(words, voice_off, a, b):
+    """Mouth-open intervals (scene time) for words spoken between a and b: quick flaps, like cartoons."""
+    out = []
+    for w in words:
+        ws, we = voice_off + w["start"], voice_off + w["end"]
+        if we <= a or ws >= b:
+            continue
+        t = max(ws, a)
+        end = min(we, b)
+        while t < end - 0.04:
+            out.append([round(t, 3), round(min(end, t + 0.1), 3)])
+            t += 0.17
+    return out
+
+
 def resolve(project: dict, plan: dict, voices: dict) -> list[str]:
-    """Fill keyframes for every pop-up layer. Returns notes for the log."""
+    """Fill keyframes + animation (walk cycles, talking mouth, gestures) for every pop-up layer."""
     notes = []
     windows = {w["id"]: w for w in plan["scenes"]}
     for sc in project["scenes"]:
@@ -71,43 +92,120 @@ def resolve(project: dict, plan: dict, voices: dict) -> list[str]:
         scene_len = win["end"] - win["start"]
         words = (voices.get(sc["id"]) or {}).get("words") or []
         voice_off = (win.get("voice_start") or win["start"]) - win["start"]
+        voice_end = voice_off + (words[-1]["end"] if words else scene_len)
+        snd = sc.setdefault("sfx", [])
         last = 0.0
         for k, layer in enumerate(ov["layers"]):
             pu = layer.get("popup")
-            if not pu or layer.get("keyframes"):
+            if pu is None or layer.get("keyframes"):
                 continue
+            when = lambda v, after, default: _when(v, words, voice_off, scene_len, after, default)
             default_at = min(scene_len * 0.6, 0.4 + k * 1.2)
-            t0 = max(0.0, _when(pu.get("at"), words, voice_off, scene_len, last, default_at) - 0.15)
+            t0 = max(0.0, when(pu.get("at"), last, default_at) - 0.15)
             t0 = min(t0, max(0.0, scene_len - 1.0))
             last = t0 + 0.2
-            x, y = float(pu.get("x", 0.5)), float(pu.get("y", 0.92 if layer["kind"] == "character" else 0.55))
-            d = pu.get("from", "bottom")
+            is_char = layer["kind"] == "character"
+            x, y = float(pu.get("x", 0.5)), float(pu.get("y", 0.94 if is_char else 0.55))
+            d = str(pu.get("from", "bottom"))
             rest = {"x": x, "y": y, "scale": 1.0, "opacity": 1.0, "rot": float(pu.get("rot", 0.0))}
-            off = dict(rest, **_offscreen(d, layer))
-            kfs = [dict(off, t=0.0), dict(off, t=round(t0, 3))]
-            if d == "scale":
-                kfs += [dict(rest, t=round(t0 + 0.3, 3), scale=1.12, ease="easeOutCubic"),
-                        dict(rest, t=round(t0 + 0.48, 3), ease="easeInOutSine")]
+            anim = {"walk": [], "gestures": [], "mouth": [], "facing": int(pu.get("face", 1))}
+            sound = pu.get("sfx", True)
+            gait_in = d.startswith(("walk", "run"))
+            if gait_in:
+                # walks / runs in from the side named (walk_left = comes in from the left edge)
+                run = d.startswith("run")
+                side = "left" if d.endswith("left") else "right"
+                start_x = -0.12 - float(layer.get("height", 0.6)) * 0.3 if side == "left" else 1.12 + float(layer.get("height", 0.6)) * 0.3
+                dur = min(4.5, max(1.0, abs(x - start_x) / (RUN_SPEED if run else WALK_SPEED)))
+                direction = 1 if side == "left" else -1
+                kfs = [dict(rest, x=start_x, t=0.0), dict(rest, x=start_x, t=round(t0, 3)),
+                       dict(rest, t=round(t0 + dur, 3), ease="linear")]
+                anim["walk"].append({"from": round(t0, 3), "to": round(t0 + dur, 3), "dir": direction,
+                                     "frames": ["run1", "run2"] if run else ["walk1", "walk2"],
+                                     "period": RUN_PERIOD if run else WALK_PERIOD})
+                if sound:
+                    _steps(snd, t0, t0 + dur, RUN_PERIOD if run else WALK_PERIOD, run)
+                t_in = t0 + dur
             else:
-                kfs += [dict(rest, t=round(t0 + ENTER, 3), ease="easeOutBack")]
-            # gentle idle bob so a standing figure never looks frozen
-            t_in = kfs[-1]["t"]
-            t_out = _when(pu.get("out", "end"), words, voice_off, scene_len, t_in, scene_len)
+                off = dict(rest, **_offscreen(d, layer))
+                kfs = [dict(off, t=0.0), dict(off, t=round(t0, 3))]
+                if d == "scale":
+                    kfs += [dict(rest, t=round(t0 + 0.3, 3), scale=1.1, ease="easeOutCubic"),
+                            dict(rest, t=round(t0 + 0.48, 3), ease="easeInOutSine")]
+                    t_in = t0 + 0.48
+                else:
+                    kfs += [dict(rest, t=round(t0 + ENTER, 3), ease="easeOutBack")]
+                    t_in = t0 + ENTER
+                if sound:
+                    if d not in ("scale", "fade"):
+                        snd.append({"name": "slide_soft", "at": round(t0, 3), "gain_db": -3})
+                    if d != "fade":
+                        snd.append({"name": pu.get("sound", "pop_soft"),
+                                    "at": round(t0 + (0.26 if d == "scale" else ENTER - 0.1), 3), "gain_db": 0})
+            # ---- walks inside the scene: {"to": 0.7, "at": "word", "dur": 2.5, "run": false}
+            cur_x = x
+            t_last = t_in
+            for wk in (layer.get("walk") if isinstance(layer.get("walk"), list) else [layer["walk"]] if layer.get("walk") else []):
+                run = bool(wk.get("run"))
+                to_x = float(wk["to"])
+                ts = max(t_last + 0.1, when(wk.get("at"), t_last, t_last + 0.4))
+                dur = float(wk.get("dur") or min(5.0, max(0.8, abs(to_x - cur_x) / (RUN_SPEED if run else WALK_SPEED))))
+                kfs += [dict(rest, x=cur_x, t=round(ts, 3)), dict(rest, x=to_x, t=round(ts + dur, 3), ease="linear")]
+                anim["walk"].append({"from": round(ts, 3), "to": round(ts + dur, 3), "dir": 1 if to_x >= cur_x else -1,
+                                     "frames": ["run1", "run2"] if run else ["walk1", "walk2"],
+                                     "period": RUN_PERIOD if run else WALK_PERIOD})
+                if sound:
+                    _steps(snd, ts, ts + dur, RUN_PERIOD if run else WALK_PERIOD, run)
+                cur_x, t_last = to_x, ts + dur
+            rest_end = dict(rest, x=cur_x)
+            # ---- talking: true (the whole narration while on screen) or {"from": "word", "to": "word"}
+            tk = layer.get("talk")
+            if tk:
+                a = t_in if tk is True else when(tk.get("from"), t_in, t_in)
+                bb = voice_end if tk is True else when(tk.get("to"), a, voice_end)
+                anim["mouth"] = _mouth(words, voice_off, a, max(a, bb))
+            # ---- gestures: [{"at": "look", "pose": "point", "dur": 1.8}]
+            for g in layer.get("gestures", []):
+                ga = when(g.get("at"), t_in, t_in + 0.5)
+                anim["gestures"].append({"from": round(ga, 3), "to": round(ga + float(g.get("dur", 1.8)), 3), "pose": g["pose"]})
+            # ---- leave, or idle to the end
+            t_out = when(pu.get("out", "end"), t_last, scene_len)
+            how_out = pu.get("out_to")  # walk_left / walk_right / bottom / fade ...
             if t_out < scene_len - 0.05:
-                t_out = max(t_in + 0.4, t_out)
-                kfs += [dict(rest, t=round(t_out, 3), y=y - 0.006, ease="easeInOutSine"),
-                        dict(off, t=round(t_out + 0.4, 3), ease="easeInBack")]
+                t_out = max(t_last + 0.4, t_out)
+                if how_out and str(how_out).startswith(("walk", "run")):
+                    run = str(how_out).startswith("run")
+                    side = "left" if str(how_out).endswith("left") else "right"
+                    end_x = -0.3 if side == "left" else 1.3
+                    dur = min(4.0, max(0.8, abs(end_x - cur_x) / (RUN_SPEED if run else WALK_SPEED)))
+                    kfs += [dict(rest_end, t=round(t_out, 3)), dict(rest_end, x=end_x, t=round(t_out + dur, 3), ease="linear")]
+                    anim["walk"].append({"from": round(t_out, 3), "to": round(t_out + dur, 3), "dir": 1 if side == "right" else -1,
+                                         "frames": ["run1", "run2"] if run else ["walk1", "walk2"],
+                                         "period": RUN_PERIOD if run else WALK_PERIOD})
+                    if sound:
+                        _steps(snd, t_out, t_out + dur, RUN_PERIOD if run else WALK_PERIOD, run)
+                else:
+                    off = dict(rest_end, **_offscreen(how_out or (d if not gait_in else "bottom"), layer))
+                    kfs += [dict(rest_end, t=round(t_out, 3), y=y - 0.006, ease="easeInOutSine"),
+                            dict(off, t=round(t_out + 0.4, 3), ease="easeInCubic")]
             else:
-                kfs += [dict(rest, t=round(scene_len + 0.5, 3), y=y - 0.008, scale=1.015, ease="easeInOutSine")]
-            layer["keyframes"] = kfs
-            # sound: whoosh as it moves, pop when it lands (the audio step reads these)
+                kfs += [dict(rest_end, t=round(scene_len + 0.5, 3), y=y - 0.006, scale=1.012, ease="easeInOutSine")]
+            layer["keyframes"] = sorted(kfs, key=lambda q: q["t"])
+            layer["anim"] = anim
             layer["auto_sfx"] = False
-            snd = sc.setdefault("sfx", [])
-            if pu.get("sfx", True):
-                if d != "scale" and d != "fade":
-                    snd.append({"name": "swish", "at": round(t0, 3), "gain_db": -2})
-                snd.append({"name": pu.get("sound", "pop"), "at": round(t0 + (0.28 if d == "scale" else ENTER - 0.08), 3),
-                            "gain_db": 0})
-            notes.append(f"{sc['id']}: '{layer['id']}' pops in at {t0:.2f}s" +
-                         (f" on \"{pu['at']}\"" if isinstance(pu.get("at"), str) else ""))
+            what = "walks in" if gait_in and not d.startswith("run") else "runs in" if gait_in else "pops in"
+            notes.append(f"{sc['id']}: '{layer['id']}' {what} at {t0:.2f}s" +
+                         (f" on \"{pu['at']}\"" if isinstance(pu.get("at"), str) else "") +
+                         (f", walks {len(anim['walk']) - int(gait_in)}x" if len(anim["walk"]) > int(gait_in) else "") +
+                         (", talks" if anim["mouth"] else "") +
+                         (f", gestures {', '.join(g['pose'] for g in anim['gestures'])}" if anim["gestures"] else ""))
     return notes
+
+
+def _steps(snd: list, a: float, b: float, period: float, run: bool):
+    """Very soft footsteps, one per step picture (kept quiet: they sit under the narration)."""
+    t, i = a + period * 0.5, 0
+    while t < b:
+        snd.append({"name": "step_soft", "at": round(t, 3), "gain_db": (-4 if run else -7) - (i % 2) * 1.5})
+        t += period
+        i += 1

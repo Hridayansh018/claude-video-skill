@@ -59,16 +59,20 @@ class Mixer:
     def render(self, out_wav: str, duck_db: float = -10.0) -> str:
         voice = self.buses["voice"]
         music = self.buses["music"]
-        if np.any(music):
-            # side-chain: smooth voice envelope -> gain reduction on music
+        amb = self.buses["amb"]
+        if np.any(music) or np.any(amb):
+            # side-chain: smooth voice envelope -> gain reduction on music (and a little on ambience)
             env = np.abs(voice).max(axis=1)
             win = int(0.25 * SR)
             kernel = np.ones(win, dtype=np.float32) / win
             env = np.convolve(env, kernel, mode="same")
             amount = np.clip(env / 0.05, 0, 1)
-            gain = 1 - (1 - db(duck_db)) * amount
-            music = music * gain[:, None]
-        mix = voice + self.buses["sfx"] + self.buses["amb"] + music
+            music = music * (1 - (1 - db(duck_db)) * amount)[:, None]
+            amb = amb * (1 - (1 - db(-4.0)) * amount)[:, None]
+        # soft limiter on effects so a blast cannot punch through the narration
+        sfx = self.buses["sfx"]
+        sfx = np.where(np.abs(sfx) > 0.5, np.sign(sfx) * (0.5 + 0.5 * np.tanh((np.abs(sfx) - 0.5) / 0.5)), sfx)
+        mix = voice + sfx + amb + music
         peak = float(np.max(np.abs(mix))) or 1.0
         self.headroom = 0.98 / peak if peak > 0.98 else 1.0
         mix = mix * self.headroom

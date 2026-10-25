@@ -163,8 +163,16 @@ def gen_procedural(name: str, seed: int = 0, duration: Optional[float] = None) -
 
 
 PROCEDURAL = ["whoosh", "whoosh_soft", "swish", "impact", "impact_low", "thud", "pop", "click", "riser",
-              "sword_clash", "metal", "wind", "sea", "fire", "crowd", "battle", "rain", "drone"]
-AMBIENCE = {"wind", "sea", "fire", "crowd", "battle", "rain", "drone"}
+              "metal"]   # older built-ins; the main library is sfx_lib (see sfx_lib.NAMES)
+
+
+def _all_names():
+    from . import sfx_lib
+    return sorted(set(PROCEDURAL) | set(sfx_lib.ONE_SHOTS)), sorted(sfx_lib.BEDS)
+
+
+AMBIENCE = {"wind", "sea", "waves", "rain", "storm", "fire", "crowd", "city", "market", "battle", "war", "birds",
+            "countryside", "forest", "night", "drone"}
 
 
 def write_wav(path: str, stereo: np.ndarray) -> None:
@@ -203,6 +211,14 @@ class SFXResolver:
             got = self._freesound(name)
             if got:
                 return got
+        from . import sfx_lib
+        if name in sfx_lib.ONE_SHOTS or name in sfx_lib.BEDS:
+            bed = name in sfx_lib.BEDS
+            dur_key = round(duration, 1) if (duration and bed) else None
+            out = self.cache / f"lib2_{name}_{seed % 4}_{dur_key}.wav"
+            if not out.exists():
+                write_wav(str(out), sfx_lib.render(name, seed % 4, duration if bed else None))
+            return str(out)
         if name in PROCEDURAL:
             dur_key = round(duration, 1) if (duration and name in AMBIENCE) else None
             out = self.cache / f"proc_{name}_{seed % 4}_{dur_key}.wav"

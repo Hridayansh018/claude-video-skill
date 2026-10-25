@@ -17,6 +17,7 @@ DEFAULTS: dict[str, Any] = {
     "name": "Untitled",
     "output_dir": None,                  # default: <project dir>/output
     "canvas": {"width": 1920, "height": 1080, "fps": 30},
+    "corner_crop": 0.08,   # trim this fraction off the right+bottom edges of Flow pictures (removes the corner sparkle)
     "voice": {"provider": "kokoro", "voice": "bm_george", "speed": 1.0, "lang": "en-gb",
               "edge_voice": "en-US-ChristopherNeural", "rate": "+0%", "pitch": "+0Hz"},
     "default_style": "stickman",
@@ -34,14 +35,17 @@ DEFAULTS: dict[str, Any] = {
     "style_overrides": {},
     "subtitles": {"enabled": True, "burn_in": False, "max_words": 7, "max_chars": 42},
     "audio": {
-        "music": "auto", "music_gain_db": -21.0, "duck_db": -10.0,
-        "voice_gain_db": 0.0, "sfx_gain_db": -9.0, "ambience_gain_db": -26.0,
+        "music": "auto", "music_mood": "warm", "music_gain_db": -18.0, "duck_db": -8.0,
+        "voice_gain_db": 0.0, "sfx_gain_db": -6.0, "ambience_gain_db": -27.0,
+        "transition_sfx": "auto", "transition_gain_db": 0.0, "event_gain_db": 0.0,
+        "auto_events": True, "auto_ambience": True, "max_events_per_scene": 2,
         "target_lufs": -14.0, "auto_sfx": True, "freesound": False,
     },
     "outputs": ["ffmpeg"],
     "render": {"crf": 16, "preset": "veryfast", "final_crf": 18, "final_preset": "medium",
                "motion_blur_samples": 8, "shutter": 180, "workers": None, "quality": "normal"},
     "seed": 0,
+    "cast": {},                          # recurring characters: {"name": {"look": "..."}} (see cast.py)
     "scenes": [],
 }
 
@@ -61,8 +65,9 @@ SCENE_DEFAULTS: dict[str, Any] = {
     "ambience": None,
     "overlay": None,
     "title": None,
-    "clip": None,        # optional animated clip (e.g. a Google Flow / Veo video) used instead of stills
+    "clip": None,        # optional: your own video clip used instead of pictures (not AI video)
     "clip_volume_db": -14.0,
+    "auto_sfx": True,    # narration-driven event sounds + ambience for this scene
 }
 
 
@@ -118,7 +123,7 @@ def normalize(data: dict, base_dir: str, style_names: list[str]) -> dict:
         if sc["images"] is not None:
             sc["images"] = [_norm_image(x, base_dir) for x in sc["images"]]
         if sc["overlay"]:
-            sc["overlay"] = _norm_overlay(sc["overlay"], base_dir, sc["id"])
+            sc["overlay"] = _norm_overlay(sc["overlay"], base_dir, sc["id"], p.get("cast") or {})
         if i == 0 and sc["continue"]:
             raise ProjectError("The first scene cannot 'continue' a previous scene.")
         if not sc["continue"] and not sc["images"] and not sc["visual"] and not sc["overlay"]:
@@ -127,6 +132,9 @@ def normalize(data: dict, base_dir: str, style_names: list[str]) -> dict:
         sc["sfx"] = [_norm_sfx(x) for x in (sc["sfx"] or [])]
         scenes.append(sc)
     p["scenes"] = scenes
+    for name, member in (p.get("cast") or {}).items():
+        if not isinstance(member, dict) or not member.get("look"):
+            raise ProjectError(f"cast '{name}' needs a \"look\" (a description of the character)")
     if p["audio"].get("music") and p["audio"]["music"] != "auto":
         p["audio"]["music"] = _abs(p["audio"]["music"], base_dir)
     return p
@@ -157,7 +165,7 @@ def _norm_sfx(x) -> dict:
     return x
 
 
-def _norm_overlay(ov: dict, base_dir: str, sid: str) -> dict:
+def _norm_overlay(ov: dict, base_dir: str, sid: str, cast: Optional[dict] = None) -> dict:
     ov = dict(ov)
     if ov.get("background"):
         ov["background"] = _norm_image(ov["background"], base_dir)
@@ -166,9 +174,15 @@ def _norm_overlay(ov: dict, base_dir: str, sid: str) -> dict:
         layer = dict(layer)
         layer.setdefault("id", f"layer{j + 1}")
         layer.setdefault("kind", "character")
-        if not layer.get("image"):
-            raise ProjectError(f"Scene {sid}: overlay layer '{layer['id']}' needs an 'image'")
-        layer["image"] = _norm_image(layer["image"], base_dir)
+        if layer.get("cast"):
+            if layer["cast"] not in (cast or {}):
+                raise ProjectError(f"Scene {sid}: layer '{layer['id']}' uses cast '{layer['cast']}', "
+                                   f"which is not in the project's \"cast\" list")
+            layer["image"] = {"cast": layer["cast"], "pose": layer.get("pose") or "base"}
+        elif not layer.get("image"):
+            raise ProjectError(f"Scene {sid}: overlay layer '{layer['id']}' needs an 'image' or a 'cast'")
+        else:
+            layer["image"] = _norm_image(layer["image"], base_dir)
         poses = []
         for pose in layer.get("poses", []):
             pose = dict(pose)
@@ -177,7 +191,7 @@ def _norm_overlay(ov: dict, base_dir: str, sid: str) -> dict:
         layer["poses"] = sorted(poses, key=lambda q: q["t"])
         kfs = layer.get("keyframes") or []
         if not kfs and not layer.get("popup"):
-            raise ProjectError(f"Scene {sid}: overlay layer '{layer['id']}' needs 'keyframes' or a 'popup'")
+            layer["popup"] = {}                      # default: pop in early in the scene
         layer["keyframes"] = sorted(kfs, key=lambda k: k["t"])
         layer.setdefault("height", 0.6 if layer["kind"] == "character" else 0.3)
         layer.setdefault("motion_blur", True)
