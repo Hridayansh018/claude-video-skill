@@ -1,0 +1,8 @@
+{
+  "_comment": "Copy to config.json only if you need to override something. Everything is optional.",
+  "ffmpeg_path": null,
+  "ffprobe_path": null,
+  "kokoro_model": null,
+  "kokoro_voices": null,
+  "cache_dir": null
+}

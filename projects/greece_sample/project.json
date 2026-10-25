@@ -1,0 +1,78 @@
+{
+  "name": "greece_sample",
+  "default_style": "stickman",
+  "image_duration": 6.0,
+  "outputs": [
+    "ffmpeg"
+  ],
+  "scenes": [
+    {
+      "id": "s01",
+      "voiceover": "High above the city of Athens stands the Parthenon, a temple of white marble built to honour the goddess Athena. For more than two thousand years, it has watched over the people below.",
+      "duration": 12.0,
+      "visual": "Stick figure citizens in tunics walking up the stone steps toward the Parthenon on the Acropolis hill at golden hour, the city of Athens spread out below."
+    },
+    {
+      "id": "s02",
+      "voiceover": "Down in the busy marketplace, a barefoot old man named Socrates spent his days asking questions. He carried no books and wrote nothing down, yet his questions would change the way the world thinks.",
+      "duration": 14.0,
+      "visual": "The ancient Athenian agora marketplace in warm afternoon light, stone colonnades, market stalls with amphorae and baskets of olives, a clear open square in the middle.",
+      "overlay": {
+        "background": {
+          "prompt": "The ancient Athenian agora marketplace in warm afternoon light, stone colonnades, market stalls with amphorae and baskets of olives, a clear open square in the middle."
+        },
+        "background_motion": "push_in",
+        "layers": [
+          {
+            "id": "socrates",
+            "kind": "character",
+            "image": {
+              "prompt": "an old barefoot bearded philosopher with a bald head in a simple white toga, one finger raised as if asking a question"
+            },
+            "height": 0.62,
+            "popup": {
+              "at": "Socrates",
+              "x": 0.27,
+              "y": 0.95,
+              "from": "bottom"
+            }
+          },
+          {
+            "id": "student",
+            "kind": "character",
+            "image": {
+              "prompt": "a curious young student in a blue tunic holding a wax tablet, looking puzzled"
+            },
+            "height": 0.62,
+            "popup": {
+              "at": "questions",
+              "x": 0.5,
+              "y": 0.95,
+              "from": "right"
+            }
+          },
+          {
+            "id": "scroll",
+            "kind": "prop",
+            "image": {
+              "prompt": "a rolled parchment scroll tied with a red ribbon"
+            },
+            "height": 0.2,
+            "popup": {
+              "at": "wrote",
+              "x": 0.76,
+              "y": 0.42,
+              "from": "scale"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "s03",
+      "voiceover": "In 490 BC, a messenger ran from the battlefield at Marathon all the way to Athens with news of victory. His legendary run is why we still race marathons today.",
+      "duration": 12.0,
+      "visual": "An exhausted stick figure messenger running along a dusty road between olive trees, sweat flying, a dropped shield and helmet by the roadside."
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+.venv/
+.cache/
+models/*.onnx
+models/*.bin
+projects/*/output*/
+__pycache__/
+dist/
+config.json
+.env

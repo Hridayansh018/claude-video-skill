@@ -1,0 +1,50 @@
+{
+  "_comment": "Visual styles. 'stickman' is the approved Google Flow look. Prompts are built as: prompt_prefix + scene + shot + prompt_suffix. Transition types are ffmpeg xfade names (fade, fadeblack, smoothleft, slideleft, circleopen, dissolve, ...) or 'cut'.",
+
+  "stickman": {
+    "description": "Flat 2D cartoon history-explainer look: bold black outlines, soft cel shading, detailed painted backgrounds, big-head stick figures.",
+    "prompt_prefix": "Flat 2D cartoon illustration in a hand-drawn educational history animation style: clean bold black ink outlines, smooth cel shading with soft gradients, warm natural colours, richly detailed background. Characters are simple cartoon stick figures with a large perfectly round white head, small expressive face with dot eyes and simple eyebrows, thin black stick arms and legs, white rounded mitten hands and white rounded feet, wearing simple cloth clothing.",
+    "prompt_suffix": "16:9. No text, no captions, no letters, no watermark.",
+    "background_prefix": "Flat 2D cartoon background illustration in a hand-drawn educational history animation style: clean bold black ink outlines, smooth cel shading with soft gradients, warm natural colours, richly detailed environment.",
+    "character_prefix": "Flat 2D cartoon character in a hand-drawn educational history animation style: clean bold black ink outlines, smooth cel shading with soft gradients, warm natural colours. The character is a simple cartoon stick figure with a large perfectly round white head, small expressive face with dot eyes and simple eyebrows, thin black stick arms and legs, white rounded mitten hands and white rounded feet, wearing simple cloth clothing.",
+    "prop_prefix": "Flat 2D cartoon object in a hand-drawn educational history animation style: clean bold black ink outlines, smooth cel shading with soft gradients, warm natural colours.",
+    "background_suffix": "Empty scene with no people or characters in it, leave open space in the middle and foreground for characters to be added later. 16:9. No text, no captions, no watermark.",
+    "character_suffix": "A single character only, full body, centred, isolated on a plain pure white background, no ground, no shadow, no scenery, no text.",
+    "prop_suffix": "A single object only, centred, isolated on a plain pure white background, no shadow, no scenery, no text.",
+    "generator": {"provider": "flow", "width": 1376, "height": 768, "seed": 4200},
+    "shot_variants": ["wide shot", "medium shot", "close-up"],
+    "hold": {"min": 2.5, "max": 8.0},
+    "motion": {"presets": ["push_in", "pan_right", "pull_out", "pan_left"], "zoom": 0.07, "ease": "easeInOutSine"},
+    "transitions": {
+      "cut":   {"type": "fade", "duration": 0.5},
+      "scene": {"type": "smoothleft", "duration": 0.6}
+    },
+    "post": {"upscale": "lanczos", "sharpen": 0.35},
+    "frame_fx": {"grain": 0.0, "vignette": 0.12},
+    "cutout": "key",
+    "subtitle": {"font": "Arial Rounded MT Bold", "size": 50, "color": "#FFFFFF", "outline": "#1E1A1C", "outline_width": 4, "bold": 1, "margin_v": 56},
+    "sfx": {"scene_transition": "whoosh_soft", "cut_transition": null, "overlay_enter": "swish", "overlay_land": "pop"}
+  },
+
+  "oil": {
+    "description": "Cinematic historical oil painting.",
+    "prompt_prefix": "Cinematic historical documentary still, hyper-realistic graphic-novel oil painting, thick visible brushstrokes, dramatic chiaroscuro lighting, volumetric light.",
+    "prompt_suffix": "16:9 widescreen composition, no text, no letters, no watermark.",
+    "background_suffix": "Empty scene with no people in it. 16:9. No text, no watermark.",
+    "character_suffix": "A single character, full body, isolated on a plain pure white background, no ground, no shadow, oil painting style.",
+    "prop_suffix": "A single object, centred, isolated on a plain pure white background, no shadow, oil painting style.",
+    "generator": {"provider": "flow", "width": 1376, "height": 768, "seed": 7100},
+    "shot_variants": ["wide establishing shot", "medium shot", "close-up detail shot"],
+    "hold": {"min": 2.5, "max": 7.0},
+    "motion": {"presets": ["push_in", "pan_right", "pull_out", "pan_left"], "zoom": 0.09, "ease": "easeInOutSine"},
+    "transitions": {
+      "cut":   {"type": "fade", "duration": 0.6},
+      "scene": {"type": "fadeblack", "duration": 0.8}
+    },
+    "post": {"upscale": "lanczos", "sharpen": 0.5, "contrast": 1.05},
+    "frame_fx": {"grain": 0.03, "vignette": 0.3},
+    "cutout": "key",
+    "subtitle": {"font": "Georgia", "size": 52, "color": "#FFFFFF", "outline": "#000000", "outline_width": 3, "bold": 0, "margin_v": 60},
+    "sfx": {"scene_transition": "whoosh_soft", "cut_transition": null, "overlay_enter": "whoosh", "overlay_land": "impact_low"}
+  }
+}
