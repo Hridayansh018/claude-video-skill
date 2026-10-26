@@ -35,8 +35,8 @@ DEFAULTS: dict[str, Any] = {
     "style_overrides": {},
     "subtitles": {"enabled": True, "burn_in": False, "max_words": 7, "max_chars": 42},
     "audio": {
-        "music": "auto", "music_mood": "warm", "music_gain_db": -18.0, "duck_db": -8.0,
-        "voice_gain_db": 0.0, "sfx_gain_db": -6.0, "ambience_gain_db": -27.0,
+        "music": "auto", "music_mood": "auto", "music_gain_db": -15.0, "duck_db": -8.0,
+        "voice_gain_db": 0.0, "sfx_gain_db": -6.0, "ambience_gain_db": -21.0,
         "transition_sfx": "auto", "transition_gain_db": 0.0, "event_gain_db": 0.0,
         "auto_events": True, "auto_ambience": True, "max_events_per_scene": 2,
         "target_lufs": -14.0, "auto_sfx": True, "freesound": False,
@@ -45,6 +45,7 @@ DEFAULTS: dict[str, Any] = {
     "render": {"crf": 16, "preset": "veryfast", "final_crf": 18, "final_preset": "medium",
                "motion_blur_samples": 8, "shutter": 180, "workers": None, "quality": "normal"},
     "seed": 0,
+    "story_type": "auto",                # war / calm / epic / tense / dark / sad / triumph / mystery / adventure / wonder
     "cast": {},                          # recurring characters: {"name": {"look": "..."}} (see cast.py)
     "scenes": [],
 }
@@ -61,6 +62,7 @@ SCENE_DEFAULTS: dict[str, Any] = {
     "continue": False,
     "transition_in": None,
     "motion": None,
+    "mood": None,        # music style for this scene (default: detected from the story)
     "sfx": [],
     "ambience": None,
     "overlay": None,

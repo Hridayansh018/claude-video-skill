@@ -1,4 +1,4 @@
-# vdo-skill: paste a script, get a video
+# claude-video-skill: paste a script, get a video
 
 A Claude skill plus a local video engine. You paste a script into Claude and get back a finished
 1080p MP4 with captions:
@@ -9,17 +9,18 @@ A Claude skill plus a local video engine. You paste a script into Claude and get
   over the background: they pop in on the exact narration word, walk, run, talk (the mouth moves with the voice),
   gesture and leave. A recurring character keeps the same look in every scene.
 - **Voice:** Kokoro, offline and free, with a natural British or American voice.
-- **Sound:** generated background music that ducks under the voice, a soft sound-effect library (applause,
-  cheer, scream, blast, fire, battle, thunder and about 40 more) triggered by what the narration says, and
-  ambience beds. Scene-change and pop-up sounds are gentle.
+- **Music:** generated, matched to the story (war, calm, epic, tense, dark, sad, triumph, mystery, adventure,
+  wonder), changing between scenes when the story does, and ducking under the voice.
+- **Sound effects:** real CC0 recordings from SFXMint (bundled starter pack) placed at the right moment from what the
+  narration says, plus quiet ambience for places and weather. Scene-change and pop-up sounds are gentle.
 - **Motion:** smooth pans and zooms, and transitions between scenes.
 - **No AI video:** pictures only (no Veo), so there is no video watermark. The Flow corner mark is cropped out.
 
 ```
-vdo-skill/
+claude-video-skill/
   setup.bat            one-click setup (Windows)      setup.sh   (macOS / Linux)
   vdo.bat              the engine command             vdo.sh
-  skill/vdo-video/     SKILL.md: Claude's instructions (setup installs it)
+  skill/claude-video-skill/     SKILL.md: Claude's instructions (setup installs it)
   vdo/                 engine (Python)
   flow/flow_helper.js  small script Claude runs inside the Google Flow page
   models/              Kokoro voice model (downloaded by setup)
@@ -46,7 +47,7 @@ About 2 GB of free disk space is enough.
 
 ## 2. Run the setup (5–10 minutes)
 
-1. Put this folder where you want it to stay, for example `D:\vdo-skill`. If you move
+1. Put this folder where you want it to stay, for example `D:\claude-video-skill`. If you move
    it later, run setup again.
 2. Double-click **`setup.bat`**. It runs six steps, and you can run it again at any time:
 
@@ -54,8 +55,8 @@ About 2 GB of free disk space is enough.
    2. **ffmpeg:** finds it, or installs it with `winget install Gyan.FFmpeg`.
    3. **Packages:** creates `.venv` and installs `requirements.txt` into it.
    4. **Voice model:** downloads the Kokoro model into `models\`.
-   5. **Skill:** installs it to `%USERPROFILE%\.claude\skills\vdo-video\SKILL.md` (Claude Code), with this
-      folder's path filled in. It also builds `dist\vdo-video-skill.zip` to upload to the Claude app.
+   5. **Skill:** installs it to `%USERPROFILE%\.claude\skills\claude-video-skill\SKILL.md` (Claude Code), with this
+      folder's path filled in. It also builds `dist\claude-video-skill.zip` to upload to the Claude app.
    6. **Check:** runs `vdo.bat doctor`, which should end with *Everything needed is installed.*
 
 3. Test render, with no Claude or browser needed, using the sample pictures included:
@@ -78,7 +79,7 @@ winget install -e --id Python.Python.3.12
 :: ffmpeg
 winget install -e --id Gyan.FFmpeg
 :: packages
-cd /d D:\vdo-skill
+cd /d D:\claude-video-skill
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
 :: voice model (two files into models\)
@@ -88,7 +89,7 @@ curl -L -o models\voices-v1.0.bin  https://github.com/thewh1teagle/kokoro-onnx/r
 vdo.bat doctor
 ```
 
-For the skill, copy `skill\vdo-video\SKILL.md` to `%USERPROFILE%\.claude\skills\vdo-video\SKILL.md`. Then
+For the skill, copy `skill\claude-video-skill\SKILL.md` to `%USERPROFILE%\.claude\skills\claude-video-skill\SKILL.md`. Then
 replace every `{{VDO_HOME}}` in the copy with this folder's full path.
 
 ## 3. Add the skill to Claude
@@ -96,10 +97,10 @@ replace every `{{VDO_HOME}}` in the copy with this folder's full path.
 Pick the one you use:
 
 - **Claude Code** (terminal, or the desktop app's Code tab): `setup.bat` already installed the skill at
-  `%USERPROFILE%\.claude\skills\vdo-video`. Start Claude Code from any folder, and `/skills` should list
-  **vdo-video**. Claude Code runs the engine directly on your PC.
+  `%USERPROFILE%\.claude\skills\claude-video-skill`. Start Claude Code from any folder, and `/skills` should list
+  **claude-video-skill**. Claude Code runs the engine directly on your PC.
 - **Claude desktop app / claude.ai**: open **Settings → Capabilities → Skills → Upload skill** and choose
-  `dist\vdo-video-skill.zip`. For Claude to run the engine on your PC, the chat has to be able to use your
+  `dist\claude-video-skill.zip`. For Claude to run the engine on your PC, the chat has to be able to use your
   computer. That means a Code session on your PC, or a chat linked to your computer with this folder
   connected. Otherwise Claude copies the engine into its own workspace and sends you the video when it's
   done (slower, but it works).
@@ -193,27 +194,30 @@ vdo.bat doctor                                :: check the setup
 {
   "voice": {"voice": "bm_george", "speed": 1.0},
   "image_duration": 6.0,
-  "audio": {"music": "auto", "music_mood": "warm", "music_gain_db": -18},
+  "audio": {"music": "auto", "music_mood": "auto", "music_gain_db": -15},
+  "story_type": "auto",
   "corner_crop": 0.08,
   "subtitles": {"burn_in": false},
   "canvas": {"width": 1920, "height": 1080, "fps": 30}
 }
 ```
 
-- **Voices:** `bm_george`, `bm_lewis` (British male), `bf_emma` (British female), `am_michael` (US male) and
-  `af_heart` (US female). There are 54 in total.
-- **Music moods:** `warm`, `wonder` and `serious`. You can also give a path to your own music file, or
-  `null` for no music.
-- **Sound levels** (`"audio"` in project.json, dB): `music_gain_db` -18 (raise for louder music), `duck_db` -8
-  (how far music drops under the voice), `sfx_gain_db` -6, `ambience_gain_db` -27, `transition_gain_db` 0,
+- **Voices:** 50 to choose from, each with a playable sample: see **Voices** below.
+- **Story type and music:** `"story_type": "auto"` reads the script. Set it yourself with `"war"`, `"calm"`,
+  `"epic"` (cinematic), `"tense"`, `"dark"`, `"sad"`, `"triumph"`, `"mystery"`, `"adventure"`, `"wonder"` or
+  `"warm"`, or write `**Story Type:** war` at the top of the script. A scene can override it with
+  `"mood": "tense"` or `**Mood:** tense`. `"audio": {"music_mood": "epic"}` keeps one style for the whole video.
+  You can also give a path to your own music file, or `null` for no music.
+- **Sound levels** (`"audio"` in project.json, dB): `music_gain_db` -15 (raise for louder music), `duck_db` -8
+  (how far music drops under the voice), `sfx_gain_db` -6, `ambience_gain_db` -21, `transition_gain_db` 0,
   `event_gain_db` 0. `"transition_sfx": "auto"` is a soft airy swish; `"none"` removes it, or give a sound
   name. `"auto_events": false` stops narration-triggered effects, `"auto_ambience": false` the background beds.
-- **Sound effects** (`vdo.bat sfx-list`): applause, cheer, celebration, chaos, scream, gasp, laugh, battle_burst,
-  sword_clash, arrows, war_drums, war_horn, march, gallop, blast, explosion, fire_burst, thunder, earthquake,
-  crash, splash, fanfare, bell, gong, coins, anvil, heartbeat, magic and more, plus ambience beds (crowd, battle,
-  fire, market, rain, storm, sea, wind, night, forest, city, ...). All generated in code. Your own files in
-  `sfx_library\<name>\` override a built-in. Use one with `**SFX:** blast @ exploded`, or let the narration
-  trigger it ("the crowd cheered" plays a cheer).
+- **Sound effects** (`vdo.bat sfx-list`): real recordings from SFXMint (CC0, free, no key) for blast, thunder,
+  sword_clash, cheer, applause, scream, gasp, arrows, gallop, war_drums, fanfare, bell, gong, coins and more, and
+  beds for fire, wind, rain, sea, cave and countryside. Other names are generated in code. `vdo.bat sfx-fetch`
+  downloads any pack sound that is missing; `"sfx_source": "builtin"` turns real sounds off. Your own files in
+  `sfx_library\<name>\` override both. Use one with `**SFX:** blast @ exploded`, or let the narration trigger it
+  ("the crowd cheered" plays a cheer).
 - **Styles:** these live in `vdo/styles.json`. Each style has its prompt text, motion, transitions,
   caption font and sounds.
 
@@ -234,5 +238,71 @@ vdo.bat doctor                                :: check the setup
 
 - Kokoro TTS by hexgrad, ONNX build by thewh1teagle (Apache-2.0).
 - ffmpeg (LGPL/GPL).
-- Music and sound effects are generated in code, so there is nothing to license.
+- Music is generated in code, so there is nothing to license. Sound effects from SFXMint are CC0 (public domain); the rest are generated.
 - Pictures you make in Google Flow fall under Google's terms for Flow.
+
+## Voices (50 samples)
+
+Every voice below has a short sample you can play. Open `voices/index.html` in a browser for players you can click through, or click a link here. Use the name in project.json: `"voice": {"voice": "bf_emma"}`. The language is picked from the voice automatically, and the voice speaks the language of the script (the samples read a Troy sentence in each voice's own language).
+
+To remake the samples: `vdo.bat voices`.
+
+### Female (25)
+
+| Voice | Language | Sample |
+|---|---|---|
+| `af_heart` | English (US) | [▶ play](voices/af_heart.mp3) |
+| `af_bella` | English (US) | [▶ play](voices/af_bella.mp3) |
+| `af_nicole` | English (US) | [▶ play](voices/af_nicole.mp3) |
+| `af_sarah` | English (US) | [▶ play](voices/af_sarah.mp3) |
+| `af_sky` | English (US) | [▶ play](voices/af_sky.mp3) |
+| `af_alloy` | English (US) | [▶ play](voices/af_alloy.mp3) |
+| `af_aoede` | English (US) | [▶ play](voices/af_aoede.mp3) |
+| `af_jessica` | English (US) | [▶ play](voices/af_jessica.mp3) |
+| `af_kore` | English (US) | [▶ play](voices/af_kore.mp3) |
+| `af_nova` | English (US) | [▶ play](voices/af_nova.mp3) |
+| `af_river` | English (US) | [▶ play](voices/af_river.mp3) |
+| `bf_emma` | English (UK) | [▶ play](voices/bf_emma.mp3) |
+| `bf_isabella` | English (UK) | [▶ play](voices/bf_isabella.mp3) |
+| `bf_alice` | English (UK) | [▶ play](voices/bf_alice.mp3) |
+| `bf_lily` | English (UK) | [▶ play](voices/bf_lily.mp3) |
+| `ef_dora` | Spanish | [▶ play](voices/ef_dora.mp3) |
+| `ff_siwis` | French | [▶ play](voices/ff_siwis.mp3) |
+| `hf_alpha` | Hindi | [▶ play](voices/hf_alpha.mp3) |
+| `hf_beta` | Hindi | [▶ play](voices/hf_beta.mp3) |
+| `if_sara` | Italian | [▶ play](voices/if_sara.mp3) |
+| `pf_dora` | Portuguese (BR) | [▶ play](voices/pf_dora.mp3) |
+| `jf_alpha` | Japanese | [▶ play](voices/jf_alpha.mp3) |
+| `zf_xiaobei` | Chinese | [▶ play](voices/zf_xiaobei.mp3) |
+| `zf_xiaoxiao` | Chinese | [▶ play](voices/zf_xiaoxiao.mp3) |
+| `zf_xiaoyi` | Chinese | [▶ play](voices/zf_xiaoyi.mp3) |
+
+### Male (25)
+
+| Voice | Language | Sample |
+|---|---|---|
+| `am_michael` | English (US) | [▶ play](voices/am_michael.mp3) |
+| `am_adam` | English (US) | [▶ play](voices/am_adam.mp3) |
+| `am_echo` | English (US) | [▶ play](voices/am_echo.mp3) |
+| `am_eric` | English (US) | [▶ play](voices/am_eric.mp3) |
+| `am_fenrir` | English (US) | [▶ play](voices/am_fenrir.mp3) |
+| `am_liam` | English (US) | [▶ play](voices/am_liam.mp3) |
+| `am_onyx` | English (US) | [▶ play](voices/am_onyx.mp3) |
+| `am_puck` | English (US) | [▶ play](voices/am_puck.mp3) |
+| `am_santa` | English (US) | [▶ play](voices/am_santa.mp3) |
+| `bm_george` | English (UK) | [▶ play](voices/bm_george.mp3) |
+| `bm_lewis` | English (UK) | [▶ play](voices/bm_lewis.mp3) |
+| `bm_daniel` | English (UK) | [▶ play](voices/bm_daniel.mp3) |
+| `bm_fable` | English (UK) | [▶ play](voices/bm_fable.mp3) |
+| `em_alex` | Spanish | [▶ play](voices/em_alex.mp3) |
+| `em_santa` | Spanish | [▶ play](voices/em_santa.mp3) |
+| `hm_omega` | Hindi | [▶ play](voices/hm_omega.mp3) |
+| `hm_psi` | Hindi | [▶ play](voices/hm_psi.mp3) |
+| `im_nicola` | Italian | [▶ play](voices/im_nicola.mp3) |
+| `pm_alex` | Portuguese (BR) | [▶ play](voices/pm_alex.mp3) |
+| `pm_santa` | Portuguese (BR) | [▶ play](voices/pm_santa.mp3) |
+| `jm_kumo` | Japanese | [▶ play](voices/jm_kumo.mp3) |
+| `zm_yunjian` | Chinese | [▶ play](voices/zm_yunjian.mp3) |
+| `zm_yunxi` | Chinese | [▶ play](voices/zm_yunxi.mp3) |
+| `zm_yunxia` | Chinese | [▶ play](voices/zm_yunxia.mp3) |
+| `zm_yunyang` | Chinese | [▶ play](voices/zm_yunyang.mp3) |

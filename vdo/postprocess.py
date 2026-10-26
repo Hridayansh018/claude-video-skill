@@ -117,11 +117,16 @@ class PostProcessor:
 
     # ------------------------------------------------------------------ cut-outs
     def cutout(self, src: str, method: str = "auto") -> str:
-        key = stable_hash("cut", src, os.path.getmtime(src), method)
+        key = stable_hash("cut", src, os.path.getmtime(src), method, self.corner_crop)
         out = self.dir / f"cutout_{key}.png"
         if out.exists():
             return str(out)
         img = Image.open(src).convert("RGB")
+        if self.corner_crop:
+            # paint over the Flow corner mark with the screen colour so it never ends up in the cut-out
+            w_, h_ = img.size
+            fill = tuple(int(v) for v in np.median(np.asarray(img.crop((0, 0, 24, 24))).reshape(-1, 3), axis=0))
+            img.paste(fill, (int(w_ * (1 - self.corner_crop * 1.6)), int(h_ * (1 - self.corner_crop * 1.6)), w_, h_))
         rgba = None
         if method in ("auto", "rembg"):
             rgba = self._rembg(img)

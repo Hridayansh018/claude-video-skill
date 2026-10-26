@@ -436,7 +436,7 @@ def step_audio(b: Build):
     total = b.plan["duration"]
     mix = Mixer(total, b.ff)
     sfx = SFXResolver(b.settings.sfx_library_dir, b.settings.cache_dir, b.settings.freesound_api_key,
-                      bool(a.get("freesound")))
+                      bool(a.get("freesound")), a.get("sfx_source", "auto"))
     windows = {wdw["id"]: wdw for wdw in b.plan["scenes"]}
     scenes = {s["id"]: s for s in b.project["scenes"]}
 
@@ -533,11 +533,24 @@ def step_audio(b: Build):
                       length=cl["t_end"] - cl["t_start"], fade_in=0.3, fade_out=0.4, label=f"clip audio {sc['id']}")
     music = a.get("music")
     if music == "auto":
+        import hashlib
         import soundfile as sf
-        from .music import music_bed
-        music = str(b.work / f"music_{a.get('music_mood', 'warm')}_{int(total)}.wav")
+        from . import story as ST
+        from .music import music_track, canon
+        order = [wdw["id"] for wdw in b.plan["scenes"]]
+        fixed = a.get("music_mood", "auto")
+        if fixed and fixed != "auto":
+            kind, moods = canon(fixed), [canon(fixed)] * len(order)      # one style for the whole video
+        else:
+            kind, moods = ST.scene_moods([scenes[i] for i in order], b.project.get("story_type"))
+        secs = [(windows[i]["start"], windows[i]["end"], canon(m)) for i, m in zip(order, moods)]
+        secs = ST.smooth(secs) if len(set(moods)) > 1 else secs
+        b.story_kind, b.music_sections = kind, secs
+        log(f"  story type: {kind}; music: " + " -> ".join(f"{m} ({st:.0f}-{en:.0f}s)" for st, en, m in secs))
+        key = hashlib.sha1(repr((secs, int(total))).encode()).hexdigest()[:10]
+        music = str(b.work / f"music_{key}.wav")
         if not os.path.exists(music):
-            sf.write(music, music_bed(total + 1.0, a.get("music_mood", "warm"), int(a.get("music_bpm", 84))), 48000)
+            sf.write(music, music_track(secs, total + 1.0, seed=int(b.project.get("seed", 0))), 48000)
     if music:
         mix.place("music", music, 0.0, a["music_gain_db"], length=total, loop=True, fade_in=1.5,
                   fade_out=3.0, label="music")

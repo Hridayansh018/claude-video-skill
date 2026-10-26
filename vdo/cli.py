@@ -1,4 +1,4 @@
-"""Command line (run from the vdo-skill folder):
+"""Command line (run from the claude-video-skill folder):
 
   python -m vdo new  script.md  [--name greece] [--scenes 1-5] [--style stickman] [--image-duration 6]
   python -m vdo plan projects/greece/project.json     # voice + timing + image_prompts.md / image_jobs.json
@@ -142,14 +142,37 @@ def cmd_build(args):
 
 
 def cmd_sfx_list(args):
+    from . import sfx_net
     from .sfx_lib import BEDS, ONE_SHOTS
     s = load_settings(args.config)
-    log("Sound effects (generated, licence-free): " + ", ".join(sorted(ONE_SHOTS)))
-    log("Ambience beds (scene \"ambience\"): " + ", ".join(sorted(BEDS)))
-    log("Also: any folder in sfx_library/<name>/ with your own .wav/.mp3 files overrides a built-in of that name.")
+    log("Real recorded sounds (SFXMint, CC0, free, no account): " + ", ".join(sorted(sfx_net.ONE_SHOTS)))
+    log("Real ambience beds: " + ", ".join(sorted(sfx_net.BEDS)))
+    log("Generated sounds (made in code, used when no recording exists): " + ", ".join(sorted(ONE_SHOTS)))
+    log("Generated beds: " + ", ".join(sorted(BEDS)) + "   (crowd / market / battle beds contain voices: only used if you ask)")
+    log("Any folder sfx_library/<name>/ with your own .wav/.mp3 files overrides all of the above for that name.")
     lib = Path(s.sfx_library_dir)
-    names = sorted(p.name for p in lib.iterdir() if p.is_dir()) if lib.exists() else []
+    names = sorted(p.name for p in lib.iterdir() if p.is_dir() and not p.name.startswith("_")) if lib.exists() else []
     log(f"Your library ({lib}): " + (", ".join(names) if names else "(empty)"))
+
+
+def cmd_voices(args) -> None:
+    from .voices import make_samples, write_index
+    from .config import REPO_ROOT
+    from .util import find_binary
+    s = load_settings(args.config)
+    out = str(REPO_ROOT / "voices")
+    done = make_samples(s, out, find_binary("ffmpeg", getattr(s, "ffmpeg_path", None)))
+    write_index(out, done)
+    print(f"{len(done)} voice samples in {out} (open voices/index.html to listen)")
+
+
+def cmd_sfx_fetch(args):
+    from . import sfx_net
+    s = load_settings(args.config)
+    have, want = sfx_net.prefetch(s.sfx_library_dir)
+    log(f"SFXMint pack: {have} of {want} sounds available in {Path(s.sfx_library_dir) / '_sfxmint'}")
+    if have < want:
+        log("Some could not be downloaded (offline?). The engine uses its generated sounds for those.")
 
 
 def cmd_doctor(args):
@@ -183,14 +206,14 @@ def cmd_doctor(args):
 
 def main(argv=None):
     p = argparse.ArgumentParser(prog="vdo", description="Paste a script, get a video.")
-    p.add_argument("--config", help="config.json path (default: vdo-skill/config.json)")
+    p.add_argument("--config", help="config.json path (default: claude-video-skill/config.json)")
     p.add_argument("--styles", help="styles.json path (default: vdo/styles.json)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     n = sub.add_parser("new", help="create a project from a script file")
     n.add_argument("script")
     n.add_argument("--name", help="project name (default: script file name)")
-    n.add_argument("--projects-dir", help="where projects live (default: vdo-skill/projects)")
+    n.add_argument("--projects-dir", help="where projects live (default: claude-video-skill/projects)")
     n.add_argument("--style", default="stickman", help="style for every scene (stickman, oil)")
     n.add_argument("--stickman", default="", help="scene numbers forced to stickman, e.g. 10,24-25")
     n.add_argument("--oil", default="", help="scene numbers forced to oil painting")
@@ -232,6 +255,11 @@ def main(argv=None):
 
     sl = sub.add_parser("sfx-list", help="list available sound names")
     sl.set_defaults(func=cmd_sfx_list)
+
+    vp = sub.add_parser("voices", help="make a short audio sample of 50 voices in voices/ (index.html to listen)")
+    vp.set_defaults(func=cmd_voices)
+    sfp = sub.add_parser("sfx-fetch", help="download the free SFXMint sound pack (CC0) into sfx_library/_sfxmint")
+    sfp.set_defaults(func=cmd_sfx_fetch)
 
     dr = sub.add_parser("doctor", help="check tools and models")
     dr.set_defaults(func=cmd_doctor)

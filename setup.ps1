@@ -1,9 +1,9 @@
-# vdo-skill setup for Windows. Run setup.bat (it calls this) - safe to run again any time.
+# claude-video-skill setup for Windows. Run setup.bat (it calls this) - safe to run again any time.
 #   1. Python 3.10-3.12 (installs 3.12 with winget if none is found)
 #   2. ffmpeg (winget; falls back to the imageio-ffmpeg copy inside the venv)
 #   3. .venv with the Python packages from requirements.txt
 #   4. Kokoro voice model files into models\
-#   5. The Claude skill: %USERPROFILE%\.claude\skills\vdo-video\SKILL.md  (+ dist\vdo-video-skill.zip to upload)
+#   5. The Claude skill: %USERPROFILE%\.claude\skills\claude-video-skill\SKILL.md  (+ dist\claude-video-skill.zip to upload)
 #   6. vdo doctor
 param(
     [switch]$SkipSkill,
@@ -129,17 +129,17 @@ if (-not $SkipModels) {
 
 # ---------------------------------------------------------------- 5. Claude skill
 Step "5/6 Claude skill"
-$skillSrc = Join-Path $Root 'skill\vdo-video\SKILL.md'
+$skillSrc = Join-Path $Root 'skill\claude-video-skill\SKILL.md'
 $text = (Get-Content -Raw -Encoding UTF8 $skillSrc).Replace('{{VDO_HOME}}', $Root.TrimEnd('\'))
-$dist = Join-Path $Root 'dist\vdo-video'
+$dist = Join-Path $Root 'dist\claude-video-skill'
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
 [IO.File]::WriteAllText((Join-Path $dist 'SKILL.md'), $text, (New-Object Text.UTF8Encoding $false))
-$zip = Join-Path $Root 'dist\vdo-video-skill.zip'
+$zip = Join-Path $Root 'dist\claude-video-skill.zip'
 if (Test-Path $zip) { Remove-Item $zip -Force }
 Compress-Archive -Path $dist -DestinationPath $zip
 Ok "skill package for the Claude app: $zip"
 if (-not $SkipSkill) {
-    $target = Join-Path $env:USERPROFILE '.claude\skills\vdo-video'
+    $target = Join-Path $env:USERPROFILE '.claude\skills\claude-video-skill'
     New-Item -ItemType Directory -Force -Path $target | Out-Null
     [IO.File]::WriteAllText((Join-Path $target 'SKILL.md'), $text, (New-Object Text.UTF8Encoding $false))
     Ok "installed for Claude Code: $target\SKILL.md"

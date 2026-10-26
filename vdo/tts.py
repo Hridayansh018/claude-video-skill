@@ -80,6 +80,11 @@ def _split_sentences(text: str) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
+def _voice_lang(voice: str) -> str:
+    from .voices import lang_for
+    return lang_for(voice)
+
+
 def _kokoro_synth(text: str, cfg: dict, settings, out_path: str):
     """Voice sentence by sentence so every sentence has an exact start time; words are spread inside it."""
     import numpy as np
@@ -95,7 +100,7 @@ def _kokoro_synth(text: str, cfg: dict, settings, out_path: str):
     audio, words, t, sr = [], [], 0.0, 24000
     for s in _split_sentences(text):
         a, sr = k.create(s, voice=cfg.get("voice", "bm_george"), speed=float(cfg.get("speed", 1.0)),
-                         lang=cfg.get("lang", "en-gb"))
+                         lang=cfg.get("lang") or _voice_lang(cfg.get("voice", "bm_george")))
         a = np.asarray(a, dtype=np.float32)
         nz = np.nonzero(np.abs(a) > 0.01)[0]
         if len(nz):

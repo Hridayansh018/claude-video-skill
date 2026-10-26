@@ -9,8 +9,9 @@
 //   await vdo.pack(map)            same pictures as base64 kept in the page (for remote sessions);
 //                                  then read them with vdo.chunk(i) - each chunk < 250k characters
 (() => {
-  const isPic = (im) => im.naturalWidth >= 500 && /flow-content\.google\/image\//.test(im.src);
-  const uuidOf = (src) => (src.match(/image\/([0-9a-f-]{36})/) || [])[1];
+  const isPic = (im) => im.naturalWidth >= 500 && /flow-content\.google\/image\/|flow\.google\.com\/asb\//.test(im.src);
+  // older Flow: .../image/<uuid>; newer Flow: .../asb/<long token>=s1600 (the last 60 characters of the token identify it)
+  const uuidOf = (src) => (src.match(/image\/([0-9a-f-]{36})/) || src.match(/asb\/([\w-]{40,})/) || [])[1]?.slice(-60);
   const scroller = () => [...document.querySelectorAll('*')]
     .filter((e) => e.scrollHeight > e.clientHeight + 50 && /(auto|scroll)/.test(getComputedStyle(e).overflowY))
     .sort((a, b) => b.scrollHeight - a.scrollHeight)[0] || document.scrollingElement;

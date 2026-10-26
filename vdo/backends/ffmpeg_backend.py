@@ -12,6 +12,23 @@ from ..util import log
 BATCH = 40
 
 
+def _loudnorm(b, a) -> str:
+    """Two-pass loudnorm with a fixed gain: every part of the mix (music included) is raised or lowered by the
+    same amount, so a loud effect can never make the music pump up and down."""
+    import json, re, subprocess
+    tgt = a["target_lufs"]
+    base = f"loudnorm=I={tgt}:TP=-1.5:LRA=11"
+    try:
+        ff = getattr(b.ff, "ffmpeg", None) or getattr(b.ff, "exe", None) or "ffmpeg"
+        r = subprocess.run([str(ff), "-hide_banner", "-nostats", "-i", os.path.abspath(b.audio_wav), "-af",
+                            base + ":print_format=json", "-f", "null", "-"], capture_output=True, text=True)
+        m = json.loads(re.findall(r"\{[^{}]*\}", r.stderr)[-1])
+        return (base + f":measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}"
+                f":measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true")
+    except Exception:
+        return base
+
+
 def _chain(ff, segs: list[dict], fps: int, out: str, tmp_dir: Path, tag: str, crf: int = 17,
            preset: str = "medium") -> str:
     """segs: [{path, t_start, t_end, tr_type, tr_dur}] where tr_* is the transition INTO the segment.
@@ -84,7 +101,7 @@ def render_final(b) -> str:
         "-map", "0:v", "-map", "1:a",
         "-c:v", "libx264" if vf else "copy", *(["-preset", r.get("final_preset", "medium"), "-crf", str(r.get("final_crf", 18)),
                                          "-pix_fmt", "yuv420p"] if vf else []),
-        "-af", f"loudnorm=I={a['target_lufs']}:TP=-1.5:LRA=11",
+        "-af", _loudnorm(b, a),
         "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
         "-t", f"{b.plan['duration']:.3f}", "-movflags", "+faststart", os.path.abspath(out)]
     b.ff.run(args, cwd=cwd)

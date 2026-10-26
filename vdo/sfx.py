@@ -188,13 +188,15 @@ def write_wav(path: str, stereo: np.ndarray) -> None:
 
 class SFXResolver:
     def __init__(self, library_dir: str, cache_dir: str, freesound_key: Optional[str] = None,
-                 use_freesound: bool = False):
+                 use_freesound: bool = False, source: str = "auto"):
         self.library = Path(library_dir)
+        self.source = source            # "auto": real CC0 sounds from SFXMint first | "builtin": generated only
         self.cache = Path(cache_dir) / "sfx"
         self.cache.mkdir(parents=True, exist_ok=True)
         self.key = freesound_key if use_freesound else None
         self.credits: list[dict] = []
         self._fs_dead = False
+        self._net_dead = False
 
     def resolve(self, name: str, seed: int = 0, duration: Optional[float] = None) -> Optional[str]:
         """Return a file path for a named sound, or None if nothing matches."""
@@ -207,6 +209,11 @@ class SFXResolver:
             files = sorted(p for p in folder.iterdir() if p.suffix.lower() in AUDIO_EXT)
             if files:
                 return str(files[int(stable_hash(name, seed), 16) % len(files)])
+        if self.source != "builtin" and not self._net_dead:
+            from . import sfx_net
+            got = sfx_net.get(name, str(self.library), self.cache, seed, online=True)
+            if got:
+                return got
         if self.key and not self._fs_dead:
             got = self._freesound(name)
             if got:

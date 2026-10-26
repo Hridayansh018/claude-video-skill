@@ -32,6 +32,7 @@ SCENE_RE = re.compile(
 )
 PART_RE = re.compile(r"^#{1,6}\s*(Part\s+\d+[^\n]*)", re.IGNORECASE)
 FIELD_RE = re.compile(r"^\s*[\*\-]?\s*\*\*\s*([A-Za-z ]+?)\s*:\s*\*\*\s*(.*)$")
+STORY_RE = re.compile(r"^\W*(?:story\s*type|genre|music\s*style)\W*\s*:\**\s*(.+)$", re.IGNORECASE)
 ANCHOR_RE = re.compile(r"Master Style Anchor:\*\*\s*(.+)$", re.IGNORECASE)
 
 
@@ -175,6 +176,7 @@ def parse_script(text: str) -> dict:
     cur: Optional[dict] = None
     part: Optional[str] = None
     anchor = None
+    story = None
     last_field = None
 
     cast: dict = {}
@@ -193,6 +195,10 @@ def parse_script(text: str) -> dict:
                     cname = re.sub(r"[^a-z0-9]+", "_", mc.group(1).strip().lower()).strip("_")
                     cast[cname] = {"look": _clean(mc.group(2))}
                 continue
+        m_story = STORY_RE.match(line)
+        if m_story and cur is None:
+            story = _clean(m_story.group(1)).lower().split()[0].strip(".,;")
+            continue
         m_anchor = ANCHOR_RE.search(line)
         if m_anchor:
             anchor = _clean(m_anchor.group(1))
@@ -223,6 +229,8 @@ def parse_script(text: str) -> dict:
                 cur["visual"] = val
             elif key == "style":
                 cur["style"] = val.lower()
+            elif key in ("mood", "music", "music mood"):
+                cur["mood"] = val.lower().split()[0].strip(".,;") if val.strip() else None
             elif key in ("images", "image count"):
                 try:
                     cur["image_count"] = int(re.findall(r"\d+", val)[0])
@@ -261,7 +269,7 @@ def parse_script(text: str) -> dict:
     if not scenes:  # plain text: one scene per paragraph
         paras = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
         scenes = [{"number": i + 1, "voiceover": _clean(p), "visual": None} for i, p in enumerate(paras)]
-    return {"scenes": scenes, "style_anchor": anchor, "cast": cast}
+    return {"scenes": scenes, "style_anchor": anchor, "cast": cast, "story_type": story}
 
 
 def build_project(
@@ -284,6 +292,8 @@ def build_project(
         entry = {"id": f"s{n:02d}", "voiceover": sc["voiceover"]}
         if sc.get("duration"):
             entry["duration"] = sc["duration"]
+        if sc.get("mood"):
+            entry["mood"] = sc["mood"]
         if sc.get("visual"):
             entry["visual"] = sc["visual"]
         style = (style_map or {}).get(n) or sc.get("style")
@@ -309,6 +319,8 @@ def build_project(
         "outputs": outputs or ["ffmpeg"],
         "scenes": scenes_out,
     }
+    if parsed.get("story_type"):
+        project["story_type"] = parsed["story_type"]
     if parsed.get("cast"):
         project["cast"] = parsed["cast"]
     if image_provider:
