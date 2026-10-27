@@ -217,6 +217,22 @@ Actions: `walks in from left|right`, `runs in from ...`, `walks to centre|left|r
 Each pose is its own Flow picture, made with the character's master picture attached as a reference so the
 face and clothes stay the same. Claude does this for you. See `examples/greece_sample.md`.
 
+## Autopilot (one message, finished video)
+
+Give Claude a video link, a topic or a script, plus a title or project name and a length, for example:
+
+```text
+Make a 5-minute video. Source: https://youtu.be/XXXX  (or: topic / pasted script)
+Title idea: The Dancing Plague of 1518. Save to D:\vdo-skill\projects. Do not stop until it is done.
+```
+
+Claude then runs everything without asking to continue: script, project, pictures in Google Flow (built-in
+browser), build in 2K with burned-in captions, the package (5 titles, thumbnail idea, description with chapters and
+sources) and delivery of the MP4, SRT and `package.md`. It stops only if blocked (for example Google asks you to sign
+in) or if you say "stop". Defaults you can change in the same message: voice `bm_george`, `2k`, captions
+`yellow_pop`, story type `auto`. `vdo.bat chapters projects\<name>\project.json` writes the chapter lines from the
+final timings.
+
 ## 6. Using the engine by hand
 
 ```bat
@@ -227,6 +243,7 @@ vdo.bat status projects\egypt\project.json   :: what is still missing
 vdo.bat import projects\egypt\project.json   :: move Flow downloads (vdo__egypt__<id>.jpg) into images\
 vdo.bat sheet  projects\egypt\project.json   :: contact_sheet.jpg of all pictures
 vdo.bat build  projects\egypt\project.json [--preview] [--allow-missing] [--res 2k] [--captions yellow_pop]
+vdo.bat chapters projects\egypt\project.json :: YouTube chapter lines from the final timings
 vdo.bat sfx-list                              :: available sound names
 vdo.bat doctor                                :: check the setup
 ```

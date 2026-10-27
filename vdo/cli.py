@@ -142,6 +142,35 @@ def cmd_build(args):
         overrides={"resolution": args.res, "captions": args.captions})
 
 
+def cmd_chapters(args):
+    """YouTube chapter lines from the final scene timings (output/work/plan.json). Rename them in the description."""
+    proj = Path(args.project)
+    project = read_json(proj)
+    out_dir = proj.parent / project.get("output_dir", "output")
+    plan_path = out_dir / "work" / "plan.json"
+    if not plan_path.exists():
+        log("No plan yet - build the video first.")
+        sys.exit(1)
+    plan = read_json(plan_path)
+    scenes = {sc["id"]: sc for sc in project["scenes"]}
+    rows = []
+    for w in plan["scenes"]:
+        sc = scenes.get(w["id"], {})
+        title = sc.get("chapter") or " ".join((sc.get("voiceover") or w["id"]).split()[:6]).rstrip(".,;:")
+        rows.append([w["start"], title])
+    merged = []                                  # YouTube needs chapters of at least 10 s, the first at 0:00
+    for t, title in rows:
+        if merged and t - merged[-1][0] < 10:
+            continue
+        merged.append([t, title])
+    if merged:
+        merged[0][0] = 0.0
+    lines = [f"{int(t) // 60}:{int(t) % 60:02d} {title}" for t, title in merged]
+    (out_dir / "chapters.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    log("\n".join(lines))
+    log(f"wrote {out_dir / 'chapters.txt'}")
+
+
 def cmd_sfx_list(args):
     from . import sfx_net
     from .sfx_lib import BEDS, ONE_SHOTS
@@ -256,6 +285,10 @@ def main(argv=None):
     bd.add_argument("--allow-missing", action="store_true", help="use placeholders for missing pictures")
     bd.add_argument("--offline", action="store_true", help="stand-in voice and placeholders (testing only)")
     bd.set_defaults(func=cmd_build)
+
+    ch = sub.add_parser("chapters", help="YouTube chapter lines from the final timings (chapters.txt)")
+    ch.add_argument("project")
+    ch.set_defaults(func=cmd_chapters)
 
     sl = sub.add_parser("sfx-list", help="list available sound names")
     sl.set_defaults(func=cmd_sfx_list)

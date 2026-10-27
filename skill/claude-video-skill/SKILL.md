@@ -18,6 +18,38 @@ Run the work yourself, end to end; the user only pastes the script. Keep them po
 - The engine crops the Flow corner mark automatically (`corner_crop`, default 0.08). Do not turn it off.
 - Never put readable text, signs or captions into a picture prompt.
 
+## Autopilot: give a link, topic or script, get the finished video
+
+When the user gives a source (video link, topic or script) with a title, name or length, run the WHOLE job without
+stopping to ask or report: research and script, project, pictures, build, package, delivery. Do not pause after
+the pictures or between batches, and do not ask "shall I continue". Stop only when (a) blocked (Google sign-in
+needed, Flow refuses repeatedly, a tool is disconnected) or (b) the user says "stop". Progress is one line per
+stage and never waits for a reply. Use sensible defaults for anything not given: voice `bm_george` (calm British
+male), `"resolution": "2k"`, captions `yellow_pop` burned in, story type `auto`, project name from the title.
+Never delete the user's files without asking. Use the built-in browser (not Chrome) unless the user says otherwise.
+
+1. **Source.** Link: read its title, description and transcript or content, keep the topic and facts, and rewrite the
+   script in your own words (never copy). Topic: research it (current, citable sources). Script: use it as given.
+2. **Script** (about 140 spoken words per minute of length), in the engine's scene format: `**Story Type:**`, `## Cast`,
+   numbered scenes with Voiceover, Video Prompt, `**Mood:**`, `**Popups:**`, `**SFX:**`. A hook inside the first 30 s,
+   a new open loop every 60-90 s, calm British narrator, no like/subscribe asks, no hype words ("insane", "mind-blowing",
+   "you won't believe"), uncertain facts hedged ("records say", "historians suspect").
+3. **Project and plan:** `new`, then `plan`; improve the prompts in image_jobs.json (a wide and a medium shot per scene,
+   backgrounds and props as needed, one character per cast prompt, never readable text).
+4. **Pictures in Flow** (built-in browser, signed-in account, Image / Nano Banana / x1 / 16:9): submit in batches of 8,
+   wait idle, `assign` by submission order (the gallery lists newest first), bring them in with `pack` and `chunk` and
+   `import` (no downloads to the desktop; do not scroll by hand, the helper scans the gallery). Masters first, then poses
+   (talk, think, point, shock, angry, sad, walk1, walk2) with the master attached, then props. If a batch comes back
+   short, find the missing prompt on a contact sheet and redo only that one. Look at `contact_sheet.jpg` once and redo
+   only pictures with merged figures, text or the wrong style. Then straight on to the build.
+5. **Build** at the chosen size and captions (`build <project.json> --res 2k --captions yellow_pop`), check frames at a
+   pop-up moment, a walking moment and a caption; if something is wrong fix it and rebuild once.
+6. **Package** into `projects/<name>/output/package.md`: 5 titles (45-65 characters, each with the real minute count),
+   a thumbnail idea (one subject, big contrast, at most 4 words of text), and a description with chapters from
+   `vdo.bat chapters <project.json>` (rename the lines if needed), sources, and any SOUND_CREDITS.txt lines.
+7. **Deliver** the MP4, the SRT and package.md in chat, and write them to the save location when the computer is linked.
+   Finish with two or three lines: where the files are, anything that failed or was changed.
+
 ## 0. Check the machine (once per session)
 
 Run `vdo.bat doctor`. If it reports `[!!]`, stop and tell the user to double-click `setup.bat` in VDO_HOME
