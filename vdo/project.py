@@ -16,6 +16,7 @@ from .util import read_json
 DEFAULTS: dict[str, Any] = {
     "name": "Untitled",
     "output_dir": None,                  # default: <project dir>/output
+    "resolution": "1080p",               # 720p | 1080p | 2k (2560x1440) | 4k
     "canvas": {"width": 1920, "height": 1080, "fps": 30},
     "corner_crop": 0.08,   # trim this fraction off the right+bottom edges of Flow pictures (removes the corner sparkle)
     "voice": {"provider": "kokoro", "voice": "bm_george", "speed": 1.0, "lang": "en-gb",
@@ -33,7 +34,8 @@ DEFAULTS: dict[str, Any] = {
     },
     "style_change": {"type": "fadewhite", "duration": 0.7},
     "style_overrides": {},
-    "subtitles": {"enabled": True, "burn_in": False, "max_words": 7, "max_chars": 42},
+    "subtitles": {"enabled": True, "burn_in": False, "style": "scene",  # scene | white_outline | yellow_pop
+                   "max_words": 7, "max_chars": 42},
     "audio": {
         "music": "auto", "music_mood": "auto", "music_gain_db": -15.0, "duck_db": -8.0,
         "voice_gain_db": 0.0, "sfx_gain_db": -6.0, "ambience_gain_db": -21.0,

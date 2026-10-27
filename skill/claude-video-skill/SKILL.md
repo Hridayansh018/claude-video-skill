@@ -132,7 +132,7 @@ once that Google's invisible SynthID mark is still inside the pictures; it canno
 `vdo.bat build "{{VDO_HOME}}\projects\<name>\project.json"`
 
 - `--preview` for a quick half-size check; `--allow-missing` builds with placeholders.
-- About 2–4 minutes per minute of video. Output: `projects/<name>/output/<name>.mp4` (1080p, 30 fps, AAC 48 kHz,
+- About 2–4 minutes per minute of video. Output: `projects/<name>/output/<name>.mp4` (1080p by default, 2K with `--res 2k`; 30 fps, AAC 48 kHz,
   -14 LUFS) and `<name>.srt`; `report.json` lists warnings.
 - Check two or three frames (ffmpeg at a pop-up moment, at a walking moment) before saying it is done; look for
   a green fringe around characters, a wrong pose, or the corner mark.
@@ -158,12 +158,29 @@ once that Google's invisible SynthID mark is still inside the pictures; it canno
 - Levels live under `"audio"`: `music_gain_db` (default -15), `duck_db` (-8), `sfx_gain_db` (-6),
   `ambience_gain_db` (-21), `event_gain_db` (0), `auto_events`, `auto_ambience`, `max_events_per_scene`.
 
+## Turning the user's words into settings
+
+When the request mentions a feature, set it in project.json (or pass the build flag) before building:
+- "2K", "1440p", "high quality" -> `"resolution": "2k"` / `--res 2k` (say it takes about twice as long). "4K" -> `4k`.
+- "captions", "subtitles burned in", "yellow captions" -> `"subtitles": {"burn_in": true, "style": "yellow_pop"}`; "white
+  captions", "outlined" -> `white_outline`. No mention of captions: leave burn-in off (the `.srt` is always written).
+- A voice by name or feel -> `"voice": {"voice": ...}` (offer 3 from the README list if they gave only a feel).
+- A mood or genre -> `"story_type"`; louder/quieter music -> `music_gain_db`; no effects -> `auto_events` and `auto_ambience` false.
+- A character who walks in, talks or points -> `## Cast` plus `**Popups:**` lines.
+
+## First-time check ("set up claude-video-skill")
+
+If the user asks you to set the skill up: run `vdo.bat doctor` (fix `[!!]` with setup.bat), confirm the skill is listed,
+open Flow and check the settings chip (Image, Nano Banana, x1, 16:9; ask them to sign in if needed), then make a
+10-second two-scene test video with `--res 1080p --captions yellow_pop` and report where the MP4 is and anything that failed.
+
 ## Changing things afterwards
 
 - Different picture: replace `images/<id>.jpg` (or regenerate in Flow), then build.
 - Voice: `"voice": {"voice": "bm_george", "speed": 0.95}`. 50 voices (25 female, 25 male) with samples in `voices/` (`voices/index.html` plays them; names and languages in README.md). The language follows the voice. If the user asks for a voice by feel ("deep", "young woman"), offer 3 names from the README and let them listen.
 - Music: follows the story type. `"story_type": "auto"` (default) reads the script and picks war, tense, dark, sad, triumph, mystery, adventure, epic, wonder, warm or calm; each scene can switch style when it clearly says so (a victory scene in a war story gets triumph). Force it with `"story_type": "war"` (script line `**Story Type:** war`), or per scene `"mood": "tense"` (`**Mood:** tense`). `"audio": {"music_mood": "epic"}` fixes one style for the whole video. Aliases: cinematic = epic, thriller = tense, horror = dark, battle = war, history = epic. `music` can also be a file path or `null`.
-- Captions burned in: `"subtitles": {"burn_in": true}`. Crop amount: `"corner_crop": 0.08`.
+- Captions burned in: `"subtitles": {"burn_in": true, "style": "yellow_pop"}`. Styles: `scene` (per-scene look, default), `white_outline` (white capitals, thick black outline), `yellow_pop` (yellow capitals, black outline and shadow, quick pop-in). Or at build time: `vdo.bat build <project.json> --captions yellow_pop` (this also turns burn-in on). The `.srt` is always written.
+- Export size: `"resolution": "2k"` (2560x1440; also 720p, 1080p, 4k) or `vdo.bat build <project.json> --res 2k`. 2K builds use a lower CRF (cleaner) and take about twice as long. Pictures are scaled up with Lanczos, so give Flow's 2K upscale for backgrounds and scene pictures when it is offered. Crop amount: `"corner_crop": 0.08`.
 - Timing: `image_duration` (project or scene), scene `duration`.
 
 ## Remote session (you cannot run commands on the user's computer)

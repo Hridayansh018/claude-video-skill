@@ -53,17 +53,32 @@ class Build:
         return self.project["canvas"]
 
 
+RESOLUTIONS = {"720p": (1280, 720), "1080p": (1920, 1080), "2k": (2560, 1440), "1440p": (2560, 1440),
+               "4k": (3840, 2160)}
+
+
 def load(project_path: str, settings: Settings, preview: bool = False, styles_path: Optional[str] = None,
-         offline: bool = False):
+         offline: bool = False, overrides: Optional[dict] = None):
     import json
     with open(project_path, encoding="utf-8") as f:
         raw = json.load(f)
+    for k, v in (overrides or {}).items():
+        if k == "captions":
+            raw.setdefault("subtitles", {}).update({"style": v, "burn_in": True})
+        elif v:
+            raw[k] = v
     if offline:  # no network: stand-in voice and pictures, to test timing/motion/sound quickly
         raw.setdefault("voice", {})["provider"] = "dummy"
         raw["image_provider"] = "placeholder"
         raw.setdefault("audio", {})["freesound"] = False
     styles = StyleBook.load(styles_path, raw.get("style_overrides"))
     project = normalize(raw, str(Path(project_path).resolve().parent), styles.names())
+    res = RESOLUTIONS.get(str(project.get("resolution", "1080p")).lower())
+    if res:
+        project["canvas"]["width"], project["canvas"]["height"] = res
+        if res[1] > 1080:   # bigger frames: keep the encode clean
+            project["render"]["final_crf"] = min(project["render"].get("final_crf", 18), 16)
+            project["render"]["crf"] = min(project["render"].get("crf", 16), 15)
     if preview:
         c = project["canvas"]
         c["width"], c["height"] = c["width"] // 2 // 2 * 2, c["height"] // 2 // 2 * 2
@@ -580,7 +595,8 @@ def step_captions(b: Build):
     b.srt = str(b.out_dir / f"{name}.srt")
     Path(b.srt).write_text(to_srt(b.captions), encoding="utf-8")
     b.ass = str(b.work / f"{name}.ass")
-    Path(b.ass).write_text(to_ass(b.captions, b.styles, b.canvas["width"], b.canvas["height"]), encoding="utf-8")
+    Path(b.ass).write_text(to_ass(b.captions, b.styles, b.canvas["width"], b.canvas["height"],
+                                    sub.get("style", "scene")), encoding="utf-8")
 
 
 def step_outputs(b: Build, only: Optional[list[str]] = None):
@@ -595,8 +611,9 @@ def step_outputs(b: Build, only: Optional[list[str]] = None):
 
 
 def run(project_path: str, settings: Settings, preview: bool = False, plan_only: bool = False,
-        only: Optional[list[str]] = None, styles_path: Optional[str] = None, offline: bool = False) -> dict:
-    b = load(project_path, settings, preview, styles_path, offline)
+        only: Optional[list[str]] = None, styles_path: Optional[str] = None, offline: bool = False,
+        overrides: Optional[dict] = None) -> dict:
+    b = load(project_path, settings, preview, styles_path, offline, overrides)
     log(f"Project '{b.project['name']}' -> {b.out_dir}")
     if not plan_only:
         for sc in b.project["scenes"]:

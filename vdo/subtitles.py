@@ -64,8 +64,21 @@ def _ass_color(hex_color: str, alpha: int = 0) -> str:
     return f"&H{alpha:02X}{b}{g}{r}".upper()
 
 
-def to_ass(caps: list[dict], styles, width: int, height: int) -> str:
+# Caption looks (sizes are for a 1080-line frame; scaled to the real height).
+PRESETS = {
+    # white, heavy black outline (clean look)
+    "white_outline": {"font": "Arial Black", "size": 66, "color": "#FFFFFF", "outline": "#000000",
+                      "outline_width": 7, "shadow": 0, "bold": 1, "margin_v": 70, "uppercase": True, "pop": False},
+    # yellow, black outline plus drop shadow (punchy look)
+    "yellow_pop": {"font": "Arial Black", "size": 66, "color": "#FFE500", "outline": "#000000",
+                   "outline_width": 6, "shadow": 5, "bold": 1, "margin_v": 70, "uppercase": True, "pop": True},
+}
+
+
+def to_ass(caps: list[dict], styles, width: int, height: int, preset: str = "scene") -> str:
+    """preset: "scene" = per-scene style from styles.json, or a name from PRESETS."""
     scale = height / 1080.0
+    pr = PRESETS.get(preset)
     lines = [
         "[Script Info]", "ScriptType: v4.00+", f"PlayResX: {width}", f"PlayResY: {height}",
         "WrapStyle: 0", "ScaledBorderAndShadow: yes", "",
@@ -75,15 +88,20 @@ def to_ass(caps: list[dict], styles, width: int, height: int) -> str:
         "MarginL, MarginR, MarginV, Encoding",
     ]
     for name in styles.names():
-        s = styles.get(name).get("subtitle", {})
+        s = pr or styles.get(name).get("subtitle", {})
         lines.append(
             f"Style: {name},{s.get('font', 'Arial')},{int(s.get('size', 48) * scale)},"
             f"{_ass_color(s.get('color', '#FFFFFF'))},&H000000FF,{_ass_color(s.get('outline', '#000000'))},"
-            f"&H80000000,{-1 if s.get('bold') else 0},0,0,0,100,100,0,0,1,{s.get('outline_width', 3) * scale:.1f},"
-            f"0,2,80,80,{int(s.get('margin_v', 60) * scale)},1"
+            f"{'&H00000000' if s.get('shadow') else '&H80000000'},{-1 if s.get('bold') else 0},0,0,0,100,100,0,0,1,"
+            f"{s.get('outline_width', 3) * scale:.1f},{s.get('shadow', 0) * scale:.1f},2,80,80,"
+            f"{int(s.get('margin_v', 60) * scale)},1"
         )
     lines += ["", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"]
     for c in caps:
         text = c["text"].replace("\n", " ").replace("{", "(").replace("}", ")")
+        if pr and pr.get("uppercase"):
+            text = text.upper()
+        if pr and pr.get("pop"):   # quick scale-in at the start of each caption
+            text = "{\\fscx82\\fscy82\\t(0,120,\\fscx100\\fscy100)}" + text
         lines.append(f"Dialogue: 0,{_ass_ts(c['start'])},{_ass_ts(c['end'])},{c['style']},,0,0,0,,{text}")
     return "\n".join(lines) + "\n"

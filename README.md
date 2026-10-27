@@ -1,7 +1,7 @@
 # claude-video-skill: paste a script, get a video
 
 A Claude skill plus a local video engine. You paste a script into Claude and get back a finished
-1080p MP4 with captions:
+MP4 (1080p, or 2K with one flag) with captions:
 
 - **Pictures:** Google Flow (Nano Banana) in a flat 2D cartoon, stick-figure history-explainer style,
   or an oil-painting style.
@@ -13,6 +13,9 @@ A Claude skill plus a local video engine. You paste a script into Claude and get
   wonder), changing between scenes when the story does, and ducking under the voice.
 - **Sound effects:** real CC0 recordings from SFXMint (bundled starter pack) placed at the right moment from what the
   narration says, plus quiet ambience for places and weather. Scene-change and pop-up sounds are gentle.
+- **Captions:** an SRT file always, and optionally burned in with two styles: white text with a thick black
+  outline, or yellow text with a black outline and shadow (see **Captions** below).
+- **Export size:** 720p, 1080p, 2K (2560x1440) or 4K.
 - **Motion:** smooth pans and zooms, and transitions between scenes.
 - **No AI video:** pictures only (no Veo), so there is no video watermark. The Flow corner mark is cropped out.
 
@@ -94,6 +97,28 @@ replace every `{{VDO_HOME}}` in the copy with this folder's full path.
 
 ## 3. Add the skill to Claude
 
+### Quick start: paste this into Claude
+
+Open Claude Code (or a chat linked to your computer) and paste the prompt below. Change the folder if you put
+the engine somewhere else. Claude does the rest and tells you if anything needs you.
+
+```text
+Set up claude-video-skill for me.
+1. The engine is in D:\vdo-skill. Run "D:\vdo-skill\vdo.bat doctor". If anything shows [!!], run setup.bat in
+   that folder (or tell me to double-click it), then run doctor again until everything is [ok].
+2. Make sure the skill is installed (setup.bat does it) and that /skills lists claude-video-skill.
+3. Open https://flow.google.com in your browser. If it asks me to sign in, wait and tell me.
+   Check the settings chip shows Image, Nano Banana, x1, 16:9.
+4. Make a 10-second test video from a 2-scene script about any topic, with --res 1080p and
+   --captions yellow_pop, so we know voice, pictures, music, captions and render all work.
+5. Tell me where the MP4 is, and anything that failed.
+From now on, when I paste a script and ask for a video, follow the claude-video-skill instructions end to end.
+```
+
+If you use the desktop app or claude.ai instead, upload the skill first (second option below), link the chat to
+your computer with this folder connected, then paste the same prompt.
+
+
 Pick the one you use:
 
 - **Claude Code** (terminal, or the desktop app's Code tab): `setup.bat` already installed the skill at
@@ -130,6 +155,24 @@ SynthID mark is inside every Flow picture and cannot be removed; it is not visib
 In Claude, paste your script and say for example:
 
 > make a video of this script (stick-figure style)
+
+### Ask for each feature in plain words
+
+Add any of these to the request. Claude turns them into the settings shown.
+
+| You say | What Claude sets |
+|---|---|
+| "in 2K" / "export 2560x1440" | `"resolution": "2k"` (or `vdo.bat build ... --res 2k`) |
+| "with yellow captions" | `"subtitles": {"burn_in": true, "style": "yellow_pop"}` |
+| "with white outlined captions" | `"subtitles": {"burn_in": true, "style": "white_outline"}` |
+| "no burned-in captions, just the SRT" | `"subtitles": {"burn_in": false}` (the `.srt` is always written) |
+| "use the voice bf_emma" / "a deep male voice" | `"voice": {"voice": "bf_emma"}` (Claude offers 3 names from the Voices list) |
+| "make it a war story" / "mysterious music" | `"story_type": "war"` / `"mystery"` (or `**Story Type:**` in the script) |
+| "make the music quieter" | `"audio": {"music_gain_db": -18}` |
+| "no sound effects" | `"audio": {"auto_events": false, "auto_ambience": false}` |
+| "have Socrates walk in and point at the map" | a `## Cast` entry plus a `**Popups:**` line |
+| "preview first" | `vdo.bat build ... --preview` (half size, quick) |
+
 
 Claude then:
 
@@ -183,7 +226,7 @@ vdo.bat plan   projects\egypt\project.json   :: voice + timing + image_prompts.m
 vdo.bat status projects\egypt\project.json   :: what is still missing
 vdo.bat import projects\egypt\project.json   :: move Flow downloads (vdo__egypt__<id>.jpg) into images\
 vdo.bat sheet  projects\egypt\project.json   :: contact_sheet.jpg of all pictures
-vdo.bat build  projects\egypt\project.json [--preview] [--allow-missing]
+vdo.bat build  projects\egypt\project.json [--preview] [--allow-missing] [--res 2k] [--captions yellow_pop]
 vdo.bat sfx-list                              :: available sound names
 vdo.bat doctor                                :: check the setup
 ```
@@ -197,8 +240,9 @@ vdo.bat doctor                                :: check the setup
   "audio": {"music": "auto", "music_mood": "auto", "music_gain_db": -15},
   "story_type": "auto",
   "corner_crop": 0.08,
-  "subtitles": {"burn_in": false},
-  "canvas": {"width": 1920, "height": 1080, "fps": 30}
+  "subtitles": {"burn_in": true, "style": "yellow_pop"},
+  "resolution": "2k",
+  "canvas": {"fps": 30}
 }
 ```
 
@@ -218,6 +262,15 @@ vdo.bat doctor                                :: check the setup
   downloads any pack sound that is missing; `"sfx_source": "builtin"` turns real sounds off. Your own files in
   `sfx_library\<name>\` override both. Use one with `**SFX:** blast @ exploded`, or let the narration trigger it
   ("the crowd cheered" plays a cheer).
+- **Captions:** an `.srt` file is always written next to the MP4. To burn captions into the picture set
+  `"subtitles": {"burn_in": true, "style": "..."}` or build with `--captions <style>` (which also turns burn-in on).
+  Styles: `white_outline` (white capitals, thick black outline), `yellow_pop` (yellow capitals, black outline,
+  drop shadow, quick pop-in at the start of each caption), `scene` (the default: each picture style's own look from
+  `styles.json`). Other options: `max_words` (7) and `max_chars` (42) per caption. Both presets use Arial Black
+  (on Windows); if your machine lacks it, the closest bold font is used.
+- **Export size:** `"resolution": "2k"` (2560x1440), or `720p`, `1080p` (default), `4k`; or `vdo.bat build ... --res 2k`.
+  Bigger sizes use a cleaner encode (lower CRF) and take roughly twice as long at 2K. Flow's pictures are
+  1376x768 and are scaled up smoothly, so use Flow's 2K upscale for backgrounds and scene pictures when offered.
 - **Styles:** these live in `vdo/styles.json`. Each style has its prompt text, motion, transitions,
   caption font and sounds.
 

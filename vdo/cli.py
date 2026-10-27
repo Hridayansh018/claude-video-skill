@@ -138,7 +138,8 @@ def cmd_build(args):
             log(f"{len(missing)} picture(s) still missing: {', '.join(missing[:10])}{' ...' if len(missing) > 10 else ''}")
             log("Make them first (see image_prompts.md), or add --allow-missing to use placeholders.")
             sys.exit(2)
-    run(args.project, load_settings(args.config), preview=args.preview, styles_path=args.styles, offline=args.offline)
+    run(args.project, load_settings(args.config), preview=args.preview, styles_path=args.styles, offline=args.offline,
+        overrides={"resolution": args.res, "captions": args.captions})
 
 
 def cmd_sfx_list(args):
@@ -249,6 +250,9 @@ def main(argv=None):
     bd = sub.add_parser("build", help="build the video")
     bd.add_argument("project")
     bd.add_argument("--preview", action="store_true", help="half resolution, faster")
+    bd.add_argument("--res", choices=["720p", "1080p", "2k", "4k"], help="export size (2k = 2560x1440)")
+    bd.add_argument("--captions", choices=["white_outline", "yellow_pop", "scene"],
+                    help="burn captions in: white_outline | yellow_pop | scene (per-scene style)")
     bd.add_argument("--allow-missing", action="store_true", help="use placeholders for missing pictures")
     bd.add_argument("--offline", action="store_true", help="stand-in voice and placeholders (testing only)")
     bd.set_defaults(func=cmd_build)
