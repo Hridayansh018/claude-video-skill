@@ -15,6 +15,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent      # the claude-video-skill
 class Settings:
     ffmpeg_path: Optional[str] = None
     ffprobe_path: Optional[str] = None
+    main_folder: Optional[str] = None          # where projects/ lives (asked during setup); default: this folder
     kokoro_model: str = str(REPO_ROOT / "models" / "kokoro-v1.0.onnx")
     kokoro_voices: str = str(REPO_ROOT / "models" / "voices-v1.0.bin")
     hf_token: Optional[str] = None
@@ -47,6 +48,7 @@ def load_settings(config_path: Optional[str] = None) -> Settings:
 
     s.ffmpeg_path = pick("ffmpeg_path", "VDO_FFMPEG")
     s.ffprobe_path = pick("ffprobe_path", "VDO_FFPROBE")
+    s.main_folder = pick("main_folder", "VDO_MAIN_FOLDER") or str(REPO_ROOT)
     s.kokoro_model = pick("kokoro_model", "VDO_KOKORO_MODEL") or s.kokoro_model
     s.kokoro_voices = pick("kokoro_voices", "VDO_KOKORO_VOICES") or s.kokoro_voices
     s.hf_token = pick("hf_token", "HF_TOKEN")
@@ -57,3 +59,8 @@ def load_settings(config_path: Optional[str] = None) -> Settings:
     s.extra = {k: v for k, v in data.items() if k not in s.__dataclass_fields__}
     Path(s.cache_dir).mkdir(parents=True, exist_ok=True)
     return s
+
+
+def projects_dir(settings: "Settings") -> Path:
+    """<main folder>\\projects: one sub-folder per video."""
+    return Path(settings.main_folder or REPO_ROOT) / "projects"

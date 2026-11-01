@@ -7,3 +7,7 @@ kokoro-onnx>=0.4.0
 onnxruntime>=1.17
 imageio-ffmpeg>=0.4.9   # fallback ffmpeg if the system one is missing
 edge-tts>=6.1           # optional online voice ("voice": {"provider": "edge"})
+imageio>=2.30           # CapCut export (capcutapi/)
+requests>=2.31          # CapCut export (capcutapi/)
+psutil>=5.9             # CapCut export (capcutapi/)
+json5>=0.9              # CapCut export: optional config with comments

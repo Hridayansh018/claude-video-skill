@@ -5,7 +5,7 @@
   python -m vdo status projects/greece/project.json   # which pictures are still missing
   python -m vdo import projects/greece/project.json   # move Flow downloads (vdo__greece__<id>.jpg) into images/
   python -m vdo sheet  projects/greece/project.json   # contact_sheet.jpg of every picture
-  python -m vdo build projects/greece/project.json [--preview] [--allow-missing]
+  python -m vdo build projects/greece/project.json [--mp4] [--preview] [--allow-missing]
   python -m vdo doctor                                # check ffmpeg, voice model, packages
   python -m vdo sfx-list
 """
@@ -42,13 +42,15 @@ def cmd_new(args):
     src = Path(args.script)
     text = src.read_text(encoding="utf-8")
     name = safe_name(args.name or src.stem)
-    pdir = Path(args.projects_dir or REPO_ROOT / "projects") / name
+    from .config import projects_dir
+    pdir = Path(args.projects_dir) / name if args.projects_dir else projects_dir(load_settings(args.config)) / name
     if (pdir / "project.json").exists() and not args.force:
         log(f"{pdir / 'project.json'} already exists (use --force to replace it).")
         sys.exit(1)
     pdir.mkdir(parents=True, exist_ok=True)
     (pdir / "images").mkdir(exist_ok=True)
     (pdir / "clips").mkdir(exist_ok=True)
+    (pdir / "images_unused").mkdir(exist_ok=True)
     if src.resolve() != (pdir / "script.md").resolve():
         shutil.copyfile(src, pdir / "script.md")
     style_map = {n: s for flag, s in ((args.stickman, "stickman"), (args.oil, "oil")) for n in _parse_scene_list(flag)}
@@ -63,7 +65,10 @@ def cmd_new(args):
     if args.no_script_timing:
         proj["timing"] = {"duration_mode": "voice"}
     write_json(pdir / "project.json", proj)
+    from .layout import write_launchers
+    write_launchers(pdir, REPO_ROOT)
     log(f"Created {pdir / 'project.json'} with {len(proj['scenes'])} scenes.")
+    log(f"Launchers for this project (build.bat, mp4.bat, preview.bat, status.bat, files.bat) are in {pdir}")
     log(f"Next: python -m vdo plan \"{pdir / 'project.json'}\"")
 
 
@@ -119,8 +124,56 @@ def cmd_import(args):
     else:
         got = flow_import.from_downloads(pdir, name, args.downloads)
     log(f"Imported {len(got)} picture(s): {', '.join(got) if got else '-'}")
+    from .layout import tidy_images
+    moved = tidy_images(pdir)
+    if moved:
+        log(f"Moved {len(moved)} picture(s) that match no job to images_unused\\: {', '.join(moved)}")
     if got:
         log(f"Contact sheet: {flow_import.contact_sheet(pdir)}")
+
+
+def cmd_init(args):
+    """Set the main folder (where projects\\<slug> folders are created) and remember it in config.json."""
+    from .config import load_settings as _ls
+    from .layout import init_main
+    cfg = Path(args.config) if args.config else REPO_ROOT / "config.json"
+    current = _ls(args.config).main_folder
+    main = args.main
+    if not main:
+        if not sys.stdin.isatty():
+            log(f"Main folder is {current}. Pass --main <folder> to change it.")
+            return
+        ans = input(f"Main folder for your videos (projects go in <folder>\\projects) [{current}]: ").strip().strip('"')
+        main = ans or current
+    p = init_main(main, cfg)
+    log(f"Main folder: {p}")
+    log(f"Projects folder: {p / 'projects'}")
+    log(f"Saved in {cfg}")
+
+
+def cmd_where(args):
+    from .config import projects_dir
+    s = load_settings(args.config)
+    log(f"engine:   {REPO_ROOT}")
+    log(f"main:     {s.main_folder}")
+    log(f"projects: {projects_dir(s)}")
+
+
+def cmd_files(args):
+    from .layout import show_report
+    show_report(Path(args.project).parent)
+
+
+def cmd_launchers(args):
+    from .layout import write_launchers
+    pdir = Path(args.project).parent
+    log(f"Wrote {', '.join(write_launchers(pdir, REPO_ROOT))} in {pdir}")
+
+
+def cmd_tidy(args):
+    from .layout import tidy_images
+    moved = tidy_images(Path(args.project).parent)
+    log(f"Moved {len(moved)} picture(s) to images_unused\\" + (f": {', '.join(moved)}" if moved else "."))
 
 
 def cmd_sheet(args):
@@ -138,8 +191,33 @@ def cmd_build(args):
             log(f"{len(missing)} picture(s) still missing: {', '.join(missing[:10])}{' ...' if len(missing) > 10 else ''}")
             log("Make them first (see image_prompts.md), or add --allow-missing to use placeholders.")
             sys.exit(2)
+    only = None                                   # default: the project's "outputs" (CapCut draft)
+    if getattr(args, "mp4_only", False):
+        only = ["ffmpeg"]
+    elif getattr(args, "mp4", False):
+        only = ["capcut", "ffmpeg"]
     run(args.project, load_settings(args.config), preview=args.preview, styles_path=args.styles, offline=args.offline,
-        overrides={"resolution": args.res, "captions": args.captions})
+        only=only, overrides={"resolution": args.res, "captions": args.captions, "capcut": _capcut_overrides(args)})
+
+
+def _capcut_overrides(args) -> dict:
+    return {"deploy": False if getattr(args, "no_deploy", False) else None,
+            "close_app": True if getattr(args, "close_capcut", False) else None,
+            "project_name": getattr(args, "capcut_name", None)}
+
+
+def cmd_capcut(args):
+    """Build (cached steps are reused) and push the result to CapCut as an editable draft; no MP4 is rendered."""
+    from .pipeline import find_file, run
+    proj = Path(args.project)
+    jp = proj.parent / "image_jobs.json"
+    if jp.exists() and not args.allow_missing:
+        missing = [j["id"] for j in read_json(jp) if j["kind"] != "video" and not find_file(proj.parent, j)]
+        if missing:
+            log(f"{len(missing)} picture(s) still missing: {', '.join(missing[:10])}{' ...' if len(missing) > 10 else ''}")
+            sys.exit(2)
+    run(args.project, load_settings(args.config), preview=args.preview, styles_path=args.styles, only=["capcut"],
+        overrides={"resolution": args.res, "captions": args.captions, "capcut": _capcut_overrides(args)})
 
 
 def cmd_chapters(args):
@@ -230,6 +308,14 @@ def cmd_doctor(args):
         exists = Path(path).exists()
         log(f"[{'ok' if exists else '!!'}] {label}: {path}{'' if exists else '  (missing - see INSTALL.md)'}")
         ok = ok and exists
+    for mod, why in (("imageio", "CapCut export"), ("requests", "CapCut export"), ("psutil", "CapCut export")):
+        try:
+            __import__(mod)
+            log(f"[ok] {mod}: {why}")
+        except Exception:
+            log(f"[--] {mod}: not installed ({why}; run setup.bat again to add it)")
+    from .config import REPO_ROOT
+    log(f"[{'ok' if (REPO_ROOT / 'capcutapi' / 'save_draft_impl.py').exists() else '--'}] capcutapi: bundled CapCut export")
     log("Everything needed is installed." if ok else "Something is missing - see the [!!] lines and INSTALL.md.")
     sys.exit(0 if ok else 1)
 
@@ -243,7 +329,7 @@ def main(argv=None):
     n = sub.add_parser("new", help="create a project from a script file")
     n.add_argument("script")
     n.add_argument("--name", help="project name (default: script file name)")
-    n.add_argument("--projects-dir", help="where projects live (default: claude-video-skill/projects)")
+    n.add_argument("--projects-dir", help="where projects live (default: <main folder>\\projects, see vdo init)")
     n.add_argument("--style", default="stickman", help="style for every scene (stickman, oil)")
     n.add_argument("--stickman", default="", help="scene numbers forced to stickman, e.g. 10,24-25")
     n.add_argument("--oil", default="", help="scene numbers forced to oil painting")
@@ -272,19 +358,51 @@ def main(argv=None):
     im.add_argument("--chunks", nargs="+", help="text files holding vdo.chunk(i) output (remote sessions)")
     im.set_defaults(func=cmd_import)
 
+    ini = sub.add_parser("init", help="choose the main folder where projects are saved (asked during setup)")
+    ini.add_argument("--main", help="main folder; projects are created in <main>\\projects\\<name>")
+    ini.set_defaults(func=cmd_init)
+    wh = sub.add_parser("where", help="show the engine, main and projects folders")
+    wh.set_defaults(func=cmd_where)
+    fl = sub.add_parser("files", help="list everything saved for a project, with counts")
+    fl.add_argument("project")
+    fl.set_defaults(func=cmd_files)
+    la = sub.add_parser("launchers", help="(re)write build.bat, mp4.bat, preview.bat ... inside the project folder")
+    la.add_argument("project")
+    la.set_defaults(func=cmd_launchers)
+    td = sub.add_parser("tidy", help="move pictures that match no job to images_unused (nothing is deleted)")
+    td.add_argument("project")
+    td.set_defaults(func=cmd_tidy)
+
     sh = sub.add_parser("sheet", help="contact sheet of all pictures (contact_sheet.jpg)")
     sh.add_argument("project")
     sh.set_defaults(func=cmd_sheet)
 
-    bd = sub.add_parser("build", help="build the video")
+    bd = sub.add_parser("build", help="build the video and push it to CapCut as an editable draft (add --mp4 to also render an MP4 here)")
     bd.add_argument("project")
     bd.add_argument("--preview", action="store_true", help="half resolution, faster")
     bd.add_argument("--res", choices=["720p", "1080p", "2k", "4k"], help="export size (2k = 2560x1440)")
     bd.add_argument("--captions", choices=["white_outline", "yellow_pop", "scene"],
                     help="burn captions in: white_outline | yellow_pop | scene (per-scene style)")
+    bd.add_argument("--mp4", action="store_true", help="also render the MP4 on this PC (default: only push to CapCut)")
+    bd.add_argument("--mp4-only", action="store_true", help="render the MP4 on this PC and do not touch CapCut")
+    bd.add_argument("--capcut", action="store_true", help=argparse.SUPPRESS)  # old flag; CapCut is now the default
+    bd.add_argument("--no-deploy", action="store_true", help="write the CapCut draft folder only, do not copy it into CapCut")
+    bd.add_argument("--close-capcut", action="store_true", help="close CapCut if it is open (unsaved work there is lost)")
+    bd.add_argument("--capcut-name", help="project name shown in CapCut (default: the project name)")
     bd.add_argument("--allow-missing", action="store_true", help="use placeholders for missing pictures")
     bd.add_argument("--offline", action="store_true", help="stand-in voice and placeholders (testing only)")
     bd.set_defaults(func=cmd_build)
+
+    cc = sub.add_parser("capcut", help="push the project to CapCut as an editable draft (clips, audio tracks, captions)")
+    cc.add_argument("project")
+    cc.add_argument("--res", choices=["720p", "1080p", "2k", "4k"], help="draft size (2k = 2560x1440)")
+    cc.add_argument("--captions", choices=["white_outline", "yellow_pop", "scene"], help="caption style in CapCut")
+    cc.add_argument("--preview", action="store_true", help="half resolution, faster")
+    cc.add_argument("--no-deploy", action="store_true", help="write the draft folder only, do not copy it into CapCut")
+    cc.add_argument("--close-capcut", action="store_true", help="close CapCut if it is open (unsaved work there is lost)")
+    cc.add_argument("--capcut-name", help="project name shown in CapCut (default: the project name)")
+    cc.add_argument("--allow-missing", action="store_true", help="use placeholders for missing pictures")
+    cc.set_defaults(func=cmd_capcut)
 
     ch = sub.add_parser("chapters", help="YouTube chapter lines from the final timings (chapters.txt)")
     ch.add_argument("project")

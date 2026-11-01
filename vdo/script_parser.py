@@ -316,7 +316,7 @@ def build_project(
         "name": name,
         "default_style": default_style,
         "image_duration": image_duration,
-        "outputs": outputs or ["ffmpeg"],
+        "outputs": outputs or ["capcut"],
         "scenes": scenes_out,
     }
     if parsed.get("story_type"):

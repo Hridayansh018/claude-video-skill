@@ -19,10 +19,27 @@ EXTS = (".png", ".jpg", ".jpeg", ".webp")
 
 
 def _clear_old(images: Path, job_id: str):
+    """A new picture replaces an old one: the old one is moved to images_unused, never deleted."""
+    from .layout import park
     for ext in EXTS:
         p = images / f"{job_id}{ext}"
         if p.exists():
-            p.unlink()
+            park(p, images.parent / "images_unused")
+
+
+def _save_jpg(blob_or_path, images: Path, job_id: str) -> None:
+    from .layout import to_jpg
+    import io
+    tmp = images / f".{job_id}.incoming"
+    if isinstance(blob_or_path, (bytes, bytearray)):
+        tmp.write_bytes(blob_or_path)
+    else:
+        shutil.move(str(blob_or_path), tmp)
+    try:
+        _clear_old(images, job_id)
+        to_jpg(tmp, images / f"{job_id}.jpg")
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 def from_downloads(project_dir: Path, project_name: str, folder: str | None = None) -> list[str]:
@@ -37,13 +54,12 @@ def from_downloads(project_dir: Path, project_name: str, folder: str | None = No
             found[m.group(1)] = f
     moved = []
     for job_id, f in found.items():
-        _clear_old(images, job_id)
-        dst = images / f"{job_id}{f.suffix.lower()}"
-        shutil.move(str(f), dst)
+        _save_jpg(f, images, job_id)
         moved.append(job_id)
-    for f in src.iterdir():   # leftovers from earlier tries
+    for f in src.iterdir():   # leftovers from earlier tries: kept, not deleted
         if pat.match(f.name):
-            f.unlink()
+            from .layout import park
+            park(f, project_dir / "images_unused")
     return moved
 
 
@@ -88,9 +104,7 @@ def from_chunks(project_dir: Path, files: list[str]) -> list[str]:
             continue
         job_id, data = line.split(":", 1)
         blob = base64.b64decode(data)
-        ext = ".png" if blob[:4] == b"\x89PNG" else ".webp" if blob[8:12] == b"WEBP" else ".jpg"
-        _clear_old(images, job_id)
-        (images / f"{job_id}{ext}").write_bytes(blob)
+        _save_jpg(blob, images, job_id)
         saved.append(job_id)
     return saved
 

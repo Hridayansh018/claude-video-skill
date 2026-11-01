@@ -2,8 +2,16 @@
 .cache/
 models/*.onnx
 models/*.bin
-projects/*/output*/
 __pycache__/
 dist/
 config.json
 .env
+
+# CapCut export
+capcutapi/**/__pycache__/
+capcutapi/dfd_cat_*/
+capcutapi/config.json
+
+# Videos: everything inside projects/ stays on your PC; only the empty folder is kept
+projects/*
+!projects/.gitkeep

@@ -63,8 +63,12 @@ def load(project_path: str, settings: Settings, preview: bool = False, styles_pa
     with open(project_path, encoding="utf-8") as f:
         raw = json.load(f)
     for k, v in (overrides or {}).items():
+        if not v:
+            continue
         if k == "captions":
             raw.setdefault("subtitles", {}).update({"style": v, "burn_in": True})
+        elif k == "capcut":
+            raw.setdefault("capcut", {}).update({a: x for a, x in v.items() if x is not None})
         elif v:
             raw[k] = v
     if offline:  # no network: stand-in voice and pictures, to test timing/motion/sound quickly
@@ -607,6 +611,9 @@ def step_outputs(b: Build, only: Optional[list[str]] = None):
         if o == "ffmpeg":
             from .backends.ffmpeg_backend import render_final
             results["mp4"] = render_final(b)
+        elif o == "capcut":
+            from .backends.capcut_backend import export_capcut
+            results["capcut"] = export_capcut(b)
     return results
 
 

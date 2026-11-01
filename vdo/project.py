@@ -43,7 +43,8 @@ DEFAULTS: dict[str, Any] = {
         "auto_events": True, "auto_ambience": True, "max_events_per_scene": 2,
         "target_lufs": -14.0, "auto_sfx": True, "freesound": False,
     },
-    "outputs": ["ffmpeg"],
+    "outputs": ["capcut"],               # capcut = push an editable draft to CapCut (default); add "ffmpeg" to also render the MP4 here
+    "capcut": {},                        # deploy, profile, captions, audio, project_name, drafts_dir, close_app
     "render": {"crf": 16, "preset": "veryfast", "final_crf": 18, "final_preset": "medium",
                "motion_blur_samples": 8, "shutter": 180, "workers": None, "quality": "normal"},
     "seed": 0,

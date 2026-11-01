@@ -5,7 +5,9 @@ description: Turn a pasted video script into a finished narrated explainer video
 
 # claude-video-skill: script to video
 
-The engine lives in **VDO_HOME** = `{{VDO_HOME}}` (the folder holding `vdo.bat`, `vdo/`, `flow/`, `projects/`).
+The engine lives in **VDO_HOME** = `{{VDO_HOME}}` (the folder holding `vdo.bat`, `vdo/`, `flow/`). Videos are saved in
+the user's **main folder**, chosen during setup: run `vdo.bat where` to see it (`main:` and `projects:` lines). Below,
+`<main>` means that folder and `<folder>` means `<main>\projects\<slug>`, the folder of one video.
 Every command below is `"{{VDO_HOME}}\vdo.bat" <command> ...`. On macOS/Linux use `"{{VDO_HOME}}/vdo.sh"`.
 Pictures come from **Google Flow** (flow.google.com, Nano Banana image model) driven in a browser. Voice,
 music, sound, motion, characters, captions and the final render are done locally by the engine.
@@ -17,6 +19,49 @@ Run the work yourself, end to end; the user only pastes the script. Keep them po
   screen, cut out by the engine, and animated by the engine.
 - The engine crops the Flow corner mark automatically (`corner_crop`, default 0.08). Do not turn it off.
 - Never put readable text, signs or captions into a picture prompt.
+- Never delete the user's files without asking. Replaced or unmatched pictures are moved to `images_unused\`, not removed.
+- Never create `.bat` / `.sh` files in the engine folder or `<main>`. Each project already has its own launchers
+  (`build.bat`, `mp4.bat`, `preview.bat`, `status.bat`, `files.bat`, `open_output.bat`) inside `<folder>`;
+  `vdo.bat launchers <project.json>` rewrites them. Do not make others.
+- Use the built-in browser, not Chrome, for all web work, unless the user says otherwise.
+
+## Where everything is saved
+
+```
+<main>\projects\<slug>\                     <folder>
+    script.md  project.json  image_jobs.json  image_prompts.md  contact_sheet.jpg
+    build.bat mp4.bat preview.bat status.bat files.bat open_output.bat  (+ .sh)   launchers for this video
+    images\            every picture, as .jpg
+    images_unused\     pictures that match no job, or were replaced
+    output\            <slug>.mp4  <slug>.srt  <slug>_mix.m4a (final mix)  chapters.txt  package.md  capcut_draft\
+    output\work\       voice\ (one .wav per scene + a .json with its word timings), music_*.wav, stems\, plan.json
+```
+
+- Pictures: **never download to the desktop or Downloads.** Bring them in with the in-page pack (`vdo.pack` then
+  `vdo.chunk`) and `vdo.bat import <project.json> --chunks ...`; the import writes them straight into `<folder>\images\`
+  as `.jpg`, named by job id: `s05c_1.jpg` (scene picture), `s12a_bg.jpg` (background), `cast_<name>.jpg` (character
+  master), `cast_<name>_walk1.jpg` (pose), `prop_<name>.jpg`. Use the names in `image_jobs.json` (`file`); do not invent new ones.
+  Import also moves anything that matches no job to `images_unused\` (`vdo.bat tidy <project.json>` does just that).
+- Narration, music and sound effects are saved by the build in `output\work\` as above. The final mix, MP4 and SRT go in `output\`.
+- When a job is done, run `vdo.bat files <project.json>` and give the user the list it prints: what was saved, where, with counts.
+
+## Pictures only (when the user asks for just the pictures, or says "stop after the pictures")
+
+Do steps 1-4 of Autopilot and then STOP; do not build or push to CapCut. Reuse the same rules:
+- Built-in browser, the user's signed-in Google account. Check once: Image, Nano Banana, x1, 16:9.
+- Submit ALL prompts first, up to 8 per batch; wait until idle before bringing a batch in. Match pictures to jobs by
+  submission order (the gallery lists newest first). If a batch comes back short, find the missing one on a contact
+  sheet and redo only that prompt. Use the page helper; never scroll screen by screen; never click a gallery tile.
+- When the export size is 2k, use Flow's 2K upscale for every background and scene picture if Flow offers it (tell the
+  user once if it does not).
+- Make: for every scene a wide and a medium shot, plus backgrounds and props as needed (pop-up scenes get a background
+  and their wide / medium shots). Cast: as many characters as the story needs, each with a master picture and ALL 8
+  poses (talk, think, point, shock, angry, sad, walk1, walk2). One character per prompt, on a flat green screen (magenta if
+  the character is green), full body, nothing cropped. Make each pose with the master attached and check face and
+  clothes match it. No readable text in any picture.
+- Look at the contact sheet once. Redo only pictures with text, merged figures, cut-off bodies, scenery behind a
+  green-screen character, or the wrong style.
+- Then report: counts by type (from `vdo.bat files`), the contact sheet, and anything redone or still missing.
 
 ## Autopilot: give a link, topic or script, get the finished video
 
@@ -26,7 +71,7 @@ the pictures or between batches, and do not ask "shall I continue". Stop only wh
 needed, Flow refuses repeatedly, a tool is disconnected) or (b) the user says "stop". Progress is one line per
 stage and never waits for a reply. Use sensible defaults for anything not given: voice `bm_george` (calm British
 male), `"resolution": "2k"`, captions `yellow_pop` burned in, story type `auto`, project name from the title.
-Never delete the user's files without asking. Use the built-in browser (not Chrome) unless the user says otherwise.
+Save everything as described in "Where everything is saved".
 
 1. **Source.** Link: read its title, description and transcript or content, keep the topic and facts, and rewrite the
    script in your own words (never copy). Topic: research it (current, citable sources). Script: use it as given.
@@ -42,27 +87,33 @@ Never delete the user's files without asking. Use the built-in browser (not Chro
    (talk, think, point, shock, angry, sad, walk1, walk2) with the master attached, then props. If a batch comes back
    short, find the missing prompt on a contact sheet and redo only that one. Look at `contact_sheet.jpg` once and redo
    only pictures with merged figures, text or the wrong style. Then straight on to the build.
-5. **Build** at the chosen size and captions (`build <project.json> --res 2k --captions yellow_pop`), check frames at a
-   pop-up moment, a walking moment and a caption; if something is wrong fix it and rebuild once.
-6. **Package** into `projects/<name>/output/package.md`: 5 titles (45-65 characters, each with the real minute count),
+5. **Push to CapCut** at the chosen size and captions (`build <project.json> --res 2k --captions yellow_pop`). By default
+   `build` does NOT render an MP4 on this PC: it makes the voice, music and effects, then sends the whole project to
+   CapCut as an editable draft (see "Push to CapCut"). Add `--mp4` only if the user also wants an MP4 rendered here.
+   Check the draft's folder and report; fix anything wrong and push once more.
+6. **Package** into `<folder>\output\package.md`: 5 titles (45-65 characters, each with the real minute count),
    a thumbnail idea (one subject, big contrast, at most 4 words of text), and a description with chapters from
    `vdo.bat chapters <project.json>` (rename the lines if needed), sources, and any SOUND_CREDITS.txt lines.
-7. **Deliver** the MP4, the SRT and package.md in chat, and write them to the save location when the computer is linked.
-   Finish with two or three lines: where the files are, anything that failed or was changed.
+7. **Deliver:** tell the user the project is in CapCut (Drafts) and give them the SRT and package.md (the MP4 too if `--mp4`).
+   They are already in `<folder>\output\` (write a copy to any other save location the user named). Run `vdo.bat files <project.json>` and finish with its list (what was saved, where, counts)
+   plus anything that failed or was changed.
 
 ## 0. Check the machine (once per session)
 
 Run `vdo.bat doctor`. If it reports `[!!]`, stop and tell the user to double-click `setup.bat` in VDO_HOME
 (README.md there), then continue. If you cannot run commands on the user's computer, see "Remote session".
+Then run `vdo.bat where`. If `main:` is just the engine folder and the user has not chosen one, ask once: "Where should I
+save your videos? (a main folder; each video gets its own folder inside it)", then run `vdo.bat init --main "<their folder>"`.
 
 ## 1. Make the project
 
 1. Pick a short name (letters, digits, `_`), e.g. `greece`.
-2. Save the pasted script **exactly as given** to `{{VDO_HOME}}\projects\_inbox\<name>.md`.
-3. `vdo.bat new "{{VDO_HOME}}\projects\_inbox\<name>.md" --name <name>`
+2. Save the pasted script **exactly as given** to `<main>\projects\_inbox\<name>.md`.
+3. `vdo.bat new "<main>\projects\_inbox\<name>.md" --name <name>` (the project is created in `<main>\projects\<name>`
+   and gets its own launchers there; `--projects-dir` overrides the place for one project).
    - options: `--scenes 1-5`, `--style oil`, `--stickman 3,7` / `--oil 2` (per-scene style),
      `--image-duration 6`, `--no-script-timing` (ignore timestamps, follow the voice).
-4. This creates `projects/<name>/project.json`, `images/`.
+4. This creates `<folder>\project.json`, `images\`, `images_unused\` and the launchers. Use `<folder>\project.json` in the commands below.
 
 Script format the parser understands (everything except the voiceover is optional):
 
@@ -102,7 +153,7 @@ Make roughly 1 scene in 3 a pop-up scene (at most 3 layers). Popup line syntax:
 
 ## 3. Plan and write the picture prompts
 
-`vdo.bat plan "{{VDO_HOME}}\projects\<name>\project.json"`
+`vdo.bat plan "<folder>\project.json"`
 
 Voices the script (Kokoro), decides how many pictures each scene needs, resolves pop-up timing, and writes
 `image_jobs.json` (one job per picture: `id`, `kind` scene | background | cast | cast_pose | prop, `file`,
@@ -159,16 +210,17 @@ Flow marks its pictures with a small sparkle in the bottom-right corner. The eng
 (`corner_crop`) and cut-out characters discard their surroundings, so no extra step is needed. Tell the user
 once that Google's invisible SynthID mark is still inside the pictures; it cannot be removed and does not show.
 
-## 5. Build
+## 5. Build = push to CapCut
 
-`vdo.bat build "{{VDO_HOME}}\projects\<name>\project.json"`
+`vdo.bat build "<folder>\project.json"`
 
-- `--preview` for a quick half-size check; `--allow-missing` builds with placeholders.
-- About 2–4 minutes per minute of video. Output: `projects/<name>/output/<name>.mp4` (1080p by default, 2K with `--res 2k`; 30 fps, AAC 48 kHz,
-  -14 LUFS) and `<name>.srt`; `report.json` lists warnings.
-- Check two or three frames (ffmpeg at a pop-up moment, at a walking moment) before saying it is done; look for
-  a green fringe around characters, a wrong pose, or the corner mark.
-- Tell the user where the MP4 is.
+- **The default is CapCut, not a local render.** The build makes voice, music, effects and captions, then writes an
+  editable draft to `<folder>\output\capcut_draft\<name>` and copies it into CapCut. The user finishes and exports in CapCut.
+- `--mp4` also renders the MP4 here (1080p, 2K with `--res 2k`; 30 fps, AAC 48 kHz, -14 LUFS, plus `<name>_mix.m4a`);
+  `--mp4-only` renders just the MP4 and does not touch CapCut. `--preview` is a quick half-size run; `--allow-missing` uses placeholders.
+- `<name>.srt` is always written; `report.json` lists warnings.
+- Only when an MP4 was rendered: check two or three frames (a pop-up moment, a walking moment) for a green fringe,
+  a wrong pose or the corner mark.
 
 ## Sound
 
@@ -190,6 +242,17 @@ once that Google's invisible SynthID mark is still inside the pictures; it canno
 - Levels live under `"audio"`: `music_gain_db` (default -15), `duck_db` (-8), `sfx_gain_db` (-6),
   `ambience_gain_db` (-21), `event_gain_db` (0), `auto_events`, `auto_ambience`, `max_events_per_scene`.
 
+## Push to CapCut
+
+If the user wants to edit in CapCut ("send it to CapCut", "make it a CapCut draft", "I want to tweak it in CapCut"):
+`vdo.bat build "<project.json>"` (add `--res 2k --captions yellow_pop`) does this by default; `vdo.bat capcut` is the same
+without the rest. Add `--mp4` to also get the MP4. It writes the draft to `<folder>\output\capcut_draft\<name>` and,
+when CapCut is installed, copies it into CapCut's project folder. CapCut must be closed: if the command says it is open, ask
+the user to close it (or, with their OK, pass `--close-capcut`; unsaved work in CapCut is lost) and run it again. Tell the
+user to open CapCut and find the project under Drafts, and what is inside: one clip per cut with transitions, separate
+voice / effects / ambience / music tracks, and an editable caption track. In Autopilot, this is the final step; do not render an MP4
+unless the user asks for one.
+
 ## Turning the user's words into settings
 
 When the request mentions a feature, set it in project.json (or pass the build flag) before building:
@@ -198,13 +261,14 @@ When the request mentions a feature, set it in project.json (or pass the build f
   captions", "outlined" -> `white_outline`. No mention of captions: leave burn-in off (the `.srt` is always written).
 - A voice by name or feel -> `"voice": {"voice": ...}` (offer 3 from the README list if they gave only a feel).
 - A mood or genre -> `"story_type"`; louder/quieter music -> `music_gain_db`; no effects -> `auto_events` and `auto_ambience` false.
+- "Give me the MP4", "render it here" -> add `--mp4` (or `--mp4-only` to skip CapCut). Otherwise everything goes to CapCut.
 - A character who walks in, talks or points -> `## Cast` plus `**Popups:**` lines.
 
 ## First-time check ("set up claude-video-skill")
 
 If the user asks you to set the skill up: run `vdo.bat doctor` (fix `[!!]` with setup.bat), confirm the skill is listed,
 open Flow and check the settings chip (Image, Nano Banana, x1, 16:9; ask them to sign in if needed), then make a
-10-second two-scene test video with `--res 1080p --captions yellow_pop` and report where the MP4 is and anything that failed.
+10-second two-scene test project with `--res 1080p --captions yellow_pop`, push it to CapCut and report where the draft is and anything that failed.
 
 ## Changing things afterwards
 
@@ -219,7 +283,8 @@ open Flow and check the settings chip (Image, Nano Banana, x1, 16:9; ask them to
 
 Copy VDO_HOME's `vdo/`, `flow/`, `requirements.txt`, the project folder and `models/` into the workspace,
 `pip install -r requirements.txt`, run `python -m vdo <command>` there, use `vdo.pack` / `vdo.chunk` for pictures,
-then send the MP4 and write it back into `projects/<name>/output/` on the user's computer.
+then write the results back into `<folder>\output\` on the user's computer. CapCut cannot be reached from a remote workspace, so
+there render the MP4 (`--mp4-only`) and send it, and tell the user to run `capcut.bat`/`build.bat` on their PC to push the draft.
 
 ## Troubleshooting
 

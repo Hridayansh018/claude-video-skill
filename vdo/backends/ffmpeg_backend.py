@@ -106,4 +106,10 @@ def render_final(b) -> str:
         "-t", f"{b.plan['duration']:.3f}", "-movflags", "+faststart", os.path.abspath(out)]
     b.ff.run(args, cwd=cwd)
     log(f"  wrote {out}")
+    try:   # the final mix as its own file next to the MP4 (stream copy, instant)
+        mix = str(b.out_dir / f"{name}_mix.m4a")
+        b.ff.run(["-y", "-i", os.path.abspath(out), "-vn", "-c:a", "copy", os.path.abspath(mix)])
+        log(f"  wrote {mix}")
+    except Exception as e:
+        log(f"  final mix file skipped ({e})")
     return out

@@ -13,6 +13,14 @@ B=https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0
 for f in kokoro-v1.0.onnx voices-v1.0.bin; do
   [ -s "models/$f" ] || curl -L --fail -o "models/$f" "$B/$f"
 done
+# main folder: where each video gets its own folder (<main>/projects/<name>); asked once, kept in config.json
+CUR=$(.venv/bin/python -c "from vdo.config import load_settings; print(load_settings().main_folder)" 2>/dev/null || echo "$HERE")
+MAIN="${1:-}"
+if [ -z "$MAIN" ]; then
+  if [ -t 0 ]; then read -r -p "Main folder for your videos [$CUR]: " MAIN; fi
+  MAIN="${MAIN:-$CUR}"
+fi
+.venv/bin/python -m vdo init --main "$MAIN"
 mkdir -p dist/claude-video-skill "$HOME/.claude/skills/claude-video-skill"
 sed -e "s#{{VDO_HOME}}#$HERE#g" -e 's#\\vdo.bat#/vdo.sh#g; s#vdo.bat#vdo.sh#g' skill/claude-video-skill/SKILL.md > dist/claude-video-skill/SKILL.md
 cp dist/claude-video-skill/SKILL.md "$HOME/.claude/skills/claude-video-skill/SKILL.md"

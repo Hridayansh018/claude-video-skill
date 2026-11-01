@@ -1,7 +1,8 @@
 # claude-video-skill: paste a script, get a video
 
-A Claude skill plus a local video engine. You paste a script into Claude and get back a finished
-MP4 (1080p, or 2K with one flag) with captions:
+A Claude skill plus a local video engine. You paste a script into Claude and it sends the finished project to
+CapCut as an editable draft (voice, music, effects and captions already placed). Nothing is rendered on your PC
+unless you ask for an MP4 (add `--mp4`; 1080p, or 2K with one flag):
 
 - **Pictures:** Google Flow (Nano Banana) in a flat 2D cartoon, stick-figure history-explainer style,
   or an oil-painting style.
@@ -16,6 +17,8 @@ MP4 (1080p, or 2K with one flag) with captions:
 - **Captions:** an SRT file always, and optionally burned in with two styles: white text with a thick black
   outline, or yellow text with a black outline and shadow (see **Captions** below).
 - **Export size:** 720p, 1080p, 2K (2560x1440) or 4K.
+- **CapCut:** one command pushes the project into CapCut as an editable draft (clips, voice / effects / music tracks,
+  styled captions). See **Push to CapCut** below.
 - **Motion:** smooth pans and zooms, and transitions between scenes.
 - **No AI video:** pictures only (no Veo), so there is no video watermark. The Flow corner mark is cropped out.
 
@@ -28,7 +31,6 @@ claude-video-skill/
   flow/flow_helper.js  small script Claude runs inside the Google Flow page
   models/              Kokoro voice model (downloaded by setup)
   projects/            one folder per video (script, pictures, output)
-  examples/            sample script
 ```
 
 ---
@@ -52,24 +54,18 @@ About 2 GB of free disk space is enough.
 
 1. Put this folder where you want it to stay, for example `D:\claude-video-skill`. If you move
    it later, run setup again.
-2. Double-click **`setup.bat`**. It runs six steps, and you can run it again at any time:
+2. Double-click **`setup.bat`**. It runs seven steps, and you can run it again at any time (`setup.bat -MainFolder D:\Videos` skips the question):
 
    1. **Python:** finds Python 3.10–3.12, or installs 3.12 with `winget`.
    2. **ffmpeg:** finds it, or installs it with `winget install Gyan.FFmpeg`.
    3. **Packages:** creates `.venv` and installs `requirements.txt` into it.
    4. **Voice model:** downloads the Kokoro model into `models\`.
-   5. **Skill:** installs it to `%USERPROFILE%\.claude\skills\claude-video-skill\SKILL.md` (Claude Code), with this
+   5. **Main folder:** asks *"Where should your videos be saved?"* and remembers the answer in `config.json`
+      (press Enter to keep the engine folder). Every video then gets its own folder, `<main>\projects\<name>`.
+      Change it later with `vdo.bat init --main "E:\Videos"`; `vdo.bat where` shows it.
+   6. **Skill:** installs it to `%USERPROFILE%\.claude\skills\claude-video-skill\SKILL.md` (Claude Code), with this
       folder's path filled in. It also builds `dist\claude-video-skill.zip` to upload to the Claude app.
-   6. **Check:** runs `vdo.bat doctor`, which should end with *Everything needed is installed.*
-
-3. Test render, with no Claude or browser needed, using the sample pictures included:
-
-   ```
-   vdo.bat build projects\greece_sample\project.json
-   ```
-
-   The result is `projects\greece_sample\output\greece_sample.mp4` (40 seconds, three scenes, with pop-ups in
-   scene 2).
+   7. **Check:** runs `vdo.bat doctor`, which should end with *Everything needed is installed.*
 
 On macOS or Linux run `./setup.sh` instead. Install ffmpeg first with `brew install ffmpeg` or
 `sudo apt install ffmpeg`.
@@ -97,6 +93,25 @@ replace every `{{VDO_HOME}}` in the copy with this folder's full path.
 
 ## 3. Add the skill to Claude
 
+### Where your files go
+
+```
+D:\Videos\                        <- your main folder (chosen in setup)
+  projects\
+    egypt\                         <- one folder per video
+      script.md  project.json  image_jobs.json  image_prompts.md  contact_sheet.jpg
+      build.bat  mp4.bat  preview.bat  status.bat  files.bat  open_output.bat   <- launchers for this video only
+      images\            every picture as .jpg: s05c_1.jpg  s12a_bg.jpg  cast_nina.jpg  cast_nina_walk1.jpg
+      images_unused\     pictures that match nothing, or were replaced (nothing is ever deleted)
+      output\            egypt.mp4  egypt.srt  egypt_mix.m4a  chapters.txt  package.md  capcut_draft\
+        work\            voice\ (one file per scene + word timings)  music_*.wav  stems\  plan.json
+```
+
+The engine folder only holds the program (`vdo.bat`, `vdo\`, ...). Launchers are never put there: each project has its
+own, so double-click `build.bat` inside the video's folder. Pictures are never saved to the desktop or Downloads;
+they are brought straight into the project's `images\`. When a job ends Claude lists what was saved, where, and how
+many files (`vdo.bat files <project.json>` prints the same list).
+
 ### Quick start: paste this into Claude
 
 Open Claude Code (or a chat linked to your computer) and paste the prompt below. Change the folder if you put
@@ -104,14 +119,17 @@ the engine somewhere else. Claude does the rest and tells you if anything needs 
 
 ```text
 Set up claude-video-skill for me.
+0. Ask me where to save my videos (a main folder, for example D:\Videos), then run
+   "D:\vdo-skill\vdo.bat" init --main "<that folder>". Do not put any .bat files in the engine folder or the main
+   folder; each video keeps its own launchers inside its project folder.
 1. The engine is in D:\vdo-skill. Run "D:\vdo-skill\vdo.bat doctor". If anything shows [!!], run setup.bat in
    that folder (or tell me to double-click it), then run doctor again until everything is [ok].
 2. Make sure the skill is installed (setup.bat does it) and that /skills lists claude-video-skill.
 3. Open https://flow.google.com in your browser. If it asks me to sign in, wait and tell me.
    Check the settings chip shows Image, Nano Banana, x1, 16:9.
 4. Make a 10-second test video from a 2-scene script about any topic, with --res 1080p and
-   --captions yellow_pop, so we know voice, pictures, music, captions and render all work.
-5. Tell me where the MP4 is, and anything that failed.
+   --captions yellow_pop, so we know voice, pictures, music, captions and the CapCut push all work.
+5. Run vdo.bat files on the project and tell me what was saved and where, with counts, and anything that failed.
 From now on, when I paste a script and ask for a video, follow the claude-video-skill instructions end to end.
 ```
 
@@ -131,6 +149,12 @@ Pick the one you use:
   done (slower, but it works).
 
 ## 4. Let Claude make pictures in Google Flow
+
+**Pictures only:** say *"make only the pictures for this script, then stop"*. Claude uses the built-in browser, checks Flow
+is on Image / Nano Banana / x1 / 16:9, submits all prompts (up to 8 per batch), matches pictures by submission order,
+redoes only what is missing, uses Flow's 2K upscale when the export is 2k, and makes every character with a master plus
+all 8 poses (talk, think, point, shock, angry, sad, walk1, walk2) on flat green. It then stops and reports counts by type, the
+contact sheet and anything redone or missing. It does not build or push to CapCut until you say so. (Autopilot, below, does not stop.)
 
 1. Sign in to your Google account at https://flow.google.com once in the browser Claude will use, and
    accept Flow's terms yourself.
@@ -181,9 +205,9 @@ Claude then:
 3. Runs `vdo.bat plan`, which voices the script, works out the timing and writes the picture prompts.
 4. Rewrites each picture prompt to match the narration at that moment.
 5. Makes every picture in Google Flow and imports them.
-6. Runs `vdo.bat build` and tells you where the MP4 is.
+6. Runs `vdo.bat build`, which pushes the project to CapCut, and tells you where the draft is.
 
-A 5-minute script takes about 40–60 pictures and 15–25 minutes to render.
+A 5-minute script takes about 40–60 pictures and 15–25 minutes to prepare (voice, music, draft).
 
 You can say things like *"use a female voice"*, *"oil painting style for scenes 3–5"*, *"only scenes 1–5 as
 a test"*, *"burn the captions in"* or *"make the music a bit louder"*.
@@ -215,7 +239,7 @@ A recurring character is listed once under `## Cast` and then used by name, with
 Actions: `walks in from left|right`, `runs in from ...`, `walks to centre|left|right @ word`, `leaves right @ word`,
 `talks`, `points / cheers / waves / thinks / shocked / sad / angry / fights / bows / sits / kneels / falls @ word`.
 Each pose is its own Flow picture, made with the character's master picture attached as a reference so the
-face and clothes stay the same. Claude does this for you. See `examples/greece_sample.md`.
+face and clothes stay the same. Claude does this for you.
 
 ## Autopilot (one message, finished video)
 
@@ -227,24 +251,61 @@ Title idea: The Dancing Plague of 1518. Save to D:\vdo-skill\projects. Do not st
 ```
 
 Claude then runs everything without asking to continue: script, project, pictures in Google Flow (built-in
-browser), build in 2K with burned-in captions, the package (5 titles, thumbnail idea, description with chapters and
-sources) and delivery of the MP4, SRT and `package.md`. It stops only if blocked (for example Google asks you to sign
+browser), push to CapCut in 2K with captions, the package (5 titles, thumbnail idea, description with chapters and
+sources) and delivery of the CapCut draft, SRT and `package.md` (plus an MP4 only if you ask). It stops only if blocked (for example Google asks you to sign
 in) or if you say "stop". Defaults you can change in the same message: voice `bm_george`, `2k`, captions
 `yellow_pop`, story type `auto`. `vdo.bat chapters projects\<name>\project.json` writes the chapter lines from the
 final timings.
 
+## Push to CapCut
+
+```bat
+vdo.bat build projects\egypt\project.json [--res 2k] [--captions yellow_pop]          :: push to CapCut (the default)
+vdo.bat build projects\egypt\project.json --mp4                                       :: CapCut draft and an MP4 here
+vdo.bat build projects\egypt\project.json --mp4-only                                  :: MP4 only, CapCut untouched
+```
+
+You get a draft called after the project in CapCut's project list (open CapCut and look under Drafts), and a copy
+in `projects\<name>\output\capcut_draft\<name>`. It contains:
+
+- **Video:** every cut as its own clip, exactly as the engine made it (pop-up characters, walking, pans and zooms,
+  motion blur), with the scene and picture transitions. Trim, move, delete or add clips freely.
+- **Audio:** separate tracks for voice, sound effects, ambience and music, so each can be raised or lowered.
+- **Captions:** a text track from the SRT, in the project's caption style (`yellow_pop`, `white_outline` or the picture
+  style's look). Edit line by line, restyle, or delete.
+- Only free CapCut features are used, so exporting needs no CapCut Pro.
+
+CapCut must be **closed** while the draft is copied in, otherwise it may overwrite the new project. If it is open,
+the draft is written to the output folder only and the command tells you; close CapCut and run it again, or add
+`--close-capcut` (unsaved work in CapCut is lost). `--no-deploy` writes the draft folder without copying it into CapCut;
+`--capcut-name "My title"` sets the name shown in CapCut.
+
+Settings (`"capcut"` in project.json, or in config.json for every project): `deploy` (true), `captions` (true),
+`audio` (true), `project_name`, `drafts_dir` (CapCut's project folder; found automatically on Windows at
+`%LOCALAPPDATA%\CapCut\User Data\Projects\com.lveditor.draft`), `profile` (`jianying_pro_10`, the default, matches
+current CapCut 9.x on Windows), `close_app` (false). Add `"outputs": ["capcut", "ffmpeg"]` to always do both, or `["ffmpeg"]` for MP4 only.
+
+Limits: CapCut drafts are tied to the CapCut version. This was tested on the draft files (tracks, timings, transitions,
+captions and registration), not inside CapCut itself, so open it once and check; if CapCut says the draft is damaged or
+does not list it, tell Claude the CapCut version and what you see.
+
 ## 6. Using the engine by hand
 
 ```bat
-vdo.bat new  my_script.md --name egypt [--scenes 1-5] [--style oil] [--image-duration 6]
+vdo.bat new  my_script.md --name egypt [--projects-dir D:\Videos\projects] [--scenes 1-5] [--style oil] [--image-duration 6]
 vdo.bat plan   projects\egypt\project.json   :: voice + timing + image_prompts.md / image_jobs.json
 :: make each picture in images\ with the file name image_prompts.md gives (s01_1.jpg, s02_bg.jpg, ...)
 vdo.bat status projects\egypt\project.json   :: what is still missing
 vdo.bat import projects\egypt\project.json   :: move Flow downloads (vdo__egypt__<id>.jpg) into images\
 vdo.bat sheet  projects\egypt\project.json   :: contact_sheet.jpg of all pictures
-vdo.bat build  projects\egypt\project.json [--preview] [--allow-missing] [--res 2k] [--captions yellow_pop]
+vdo.bat build  projects\egypt\project.json [--mp4|--mp4-only] [--preview] [--allow-missing] [--res 2k] [--captions yellow_pop]  :: pushes to CapCut
 vdo.bat chapters projects\egypt\project.json :: YouTube chapter lines from the final timings
 vdo.bat sfx-list                              :: available sound names
+vdo.bat init --main "D:\Videos"              :: choose the main folder (setup asks too)
+vdo.bat where                                 :: show the engine, main and projects folders
+vdo.bat files  projects\egypt\project.json  :: list what was saved, where, with counts
+vdo.bat tidy   projects\egypt\project.json  :: move pictures that match no job into images_unused\
+vdo.bat launchers projects\egypt\project.json :: rewrite the .bat files inside the project folder
 vdo.bat doctor                                :: check the setup
 ```
 
@@ -306,6 +367,7 @@ vdo.bat doctor                                :: check the setup
 
 ## Credits and licences
 
+- CapCutAPI by sun-guannan (Apache-2.0) and pyJianYingDraft by GuanYixuan are bundled in `capcutapi/` for the CapCut export; see `capcutapi/NOTICE.md`.
 - Kokoro TTS by hexgrad, ONNX build by thewh1teagle (Apache-2.0).
 - ffmpeg (LGPL/GPL).
 - Music is generated in code, so there is nothing to license. Sound effects from SFXMint are CC0 (public domain); the rest are generated.

@@ -3,11 +3,13 @@
 #   2. ffmpeg (winget; falls back to the imageio-ffmpeg copy inside the venv)
 #   3. .venv with the Python packages from requirements.txt
 #   4. Kokoro voice model files into models\
-#   5. The Claude skill: %USERPROFILE%\.claude\skills\claude-video-skill\SKILL.md  (+ dist\claude-video-skill.zip to upload)
-#   6. vdo doctor
+#   5. The main folder: where your videos are saved (<main>\projects\<name>), asked once, kept in config.json
+#   6. The Claude skill: %USERPROFILE%\.claude\skills\claude-video-skill\SKILL.md  (+ dist\claude-video-skill.zip to upload)
+#   7. vdo doctor
 param(
     [switch]$SkipSkill,
-    [switch]$SkipModels
+    [switch]$SkipModels,
+    [string]$MainFolder = ''      # e.g. -MainFolder "D:\Videos" to skip the question (Claude Code can pass it)
 )
 
 $ErrorActionPreference = 'Continue'   # native tools write to stderr; we check exit codes ourselves
@@ -26,7 +28,7 @@ function Refresh-Path {
 function Has-Winget { return [bool](Get-Command winget -ErrorAction SilentlyContinue) }
 
 # ---------------------------------------------------------------- 1. Python
-Step "1/6 Python"
+Step "1/7 Python"
 function Find-Python {
     $candidates = @(@('py', '-3.12'), @('py', '-3.11'), @('py', '-3.10'), @('python'), @('python3'))
     foreach ($c in $candidates) {
@@ -62,7 +64,7 @@ if (-not $py) {
 Ok "Python $($py.ver)"
 
 # ---------------------------------------------------------------- 2. ffmpeg
-Step "2/6 ffmpeg"
+Step "2/7 ffmpeg"
 Refresh-Path
 if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
     Ok "ffmpeg found: $((Get-Command ffmpeg).Source)"
@@ -79,7 +81,7 @@ if (Get-Command ffmpeg -ErrorAction SilentlyContinue) {
 }
 
 # ---------------------------------------------------------------- 3. venv + packages
-Step "3/6 Python packages (.venv)"
+Step "3/7 Python packages (.venv)"
 $venvPy = Join-Path $Root '.venv\Scripts\python.exe'
 if (-not (Test-Path $venvPy)) {
     & $py.exe @($py.pre) -m venv (Join-Path $Root '.venv')
@@ -101,7 +103,7 @@ if (-not $ortOk) {
 Ok "packages installed"
 
 # ---------------------------------------------------------------- 4. Kokoro voice model
-Step "4/6 Kokoro voice model"
+Step "4/7 Kokoro voice model"
 $models = Join-Path $Root 'models'
 New-Item -ItemType Directory -Force -Path $models | Out-Null
 $base = 'https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0'
@@ -127,8 +129,30 @@ if (-not $SkipModels) {
     }
 }
 
-# ---------------------------------------------------------------- 5. Claude skill
-Step "5/6 Claude skill"
+# ---------------------------------------------------------------- 5. main folder
+Step "5/7 Main folder (where your videos are saved)"
+$cfgPath = Join-Path $Root 'config.json'
+$cfg = [ordered]@{}
+if (Test-Path $cfgPath) {
+    try { (Get-Content -Raw -Encoding UTF8 $cfgPath | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $cfg[$_.Name] = $_.Value } } catch { }
+}
+$current = if ($cfg.Contains('main_folder') -and $cfg['main_folder']) { [string]$cfg['main_folder'] } else { $Root.TrimEnd('\') }
+if (-not $MainFolder) {
+    if ([Console]::IsInputRedirected) {
+        $MainFolder = $current
+    } else {
+        Write-Host "  Every video gets its own folder: <main folder>\projects\<name>  (pictures, voice, music, the MP4)."
+        $ans = Read-Host "  Main folder [$current]"
+        $MainFolder = if ($ans) { $ans.Trim('"') } else { $current }
+    }
+}
+New-Item -ItemType Directory -Force -Path (Join-Path $MainFolder 'projects') | Out-Null
+$cfg['main_folder'] = $MainFolder
+[IO.File]::WriteAllText($cfgPath, ($cfg | ConvertTo-Json), (New-Object Text.UTF8Encoding $false))
+Ok "main folder: $MainFolder   (projects go in $MainFolder\projects)"
+
+# ---------------------------------------------------------------- 6. Claude skill
+Step "6/7 Claude skill"
 $skillSrc = Join-Path $Root 'skill\claude-video-skill\SKILL.md'
 $text = (Get-Content -Raw -Encoding UTF8 $skillSrc).Replace('{{VDO_HOME}}', $Root.TrimEnd('\'))
 $dist = Join-Path $Root 'dist\claude-video-skill'
@@ -146,12 +170,12 @@ if (-not $SkipSkill) {
 }
 
 # ---------------------------------------------------------------- 6. doctor
-Step "6/6 Check"
+Step "7/7 Check"
 & (Join-Path $Root 'vdo.bat') doctor
 if ($LASTEXITCODE -eq 0) {
     Write-Host ""
     Write-Host "Setup complete." -ForegroundColor Green
-    Write-Host "Test render (uses the sample pictures):  vdo.bat build projects\greece_sample\project.json"
+    Write-Host "Your videos are saved in:  $MainFolder\projects\<name>"
     Write-Host "Then in Claude: paste a script and say 'make a video of this'."
 } else {
     Warn "Setup finished with problems - read the [!!] lines above (README.md > Troubleshooting)."
